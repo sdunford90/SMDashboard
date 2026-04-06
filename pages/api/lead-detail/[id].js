@@ -48,10 +48,11 @@ export default async function handler(req, res) {
           : null,
         notes: eng.body || "",
         recordingUrl: eng.recordingUrl,
+        isLogged: eng.isLogged || false,
         label:
           eng.direction === "INBOUND"
             ? `Inbound Call -- ${eng.disposition}`
-            : `Outbound Call -- ${eng.disposition}`,
+            : `${eng.isLogged ? "Logged Call" : "Outbound Call"} -- ${eng.disposition}`,
       };
     });
 

@@ -582,7 +582,8 @@ export default function Dashboard() {
                           <td className="px-4 py-3 text-xs text-gray-600">
                             <span title="Outbound">{lead.callsOutbound}o</span>{" "}
                             <span title="Inbound">{lead.callsInbound}i</span>{" "}
-                            <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>
+                            <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>{" "}
+                            {lead.callsLogged > 0 && <span title="Logged" className="text-purple-600">{lead.callsLogged}lg</span>}
                           </td>
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <a
@@ -805,7 +806,9 @@ function LeadDetailPanel({ detail, loading }) {
             <div key={i} className="relative pl-6 pb-4">
               <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
                 event.type === "CALL"
-                  ? event.direction === "INBOUND" ? "bg-orange-400" : "bg-navy"
+                  ? event.isLogged ? "bg-purple-500"
+                  : event.direction === "INBOUND" ? "bg-orange-400"
+                  : "bg-navy"
                   : event.subtype === "EMAIL_INBOUND" ? "bg-gray-400"
                   : event.subtype === "EMAIL_LOGGED" ? "bg-purple-500"
                   : event.isAutomated ? "bg-gray-300"

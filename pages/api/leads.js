@@ -28,6 +28,7 @@ export default async function handler(req, res) {
       callsOutbound: lead.callsOutbound,
       callsInbound: lead.callsInbound,
       callsConnected: lead.callsConnected,
+      callsLogged: lead.callsLogged,
       lastTouch: lead.lastTouch,
       hubspotUrl: lead.hubspotUrl,
       status: lead.hasMissedInbound

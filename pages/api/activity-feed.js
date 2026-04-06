@@ -25,8 +25,12 @@ export default async function handler(req, res) {
           summary = `${dirLabel} ${lead.name}${eng.subject ? " -- " + eng.subject : ""}`;
         } else {
           subtype =
-            eng.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL";
-          const callDir = eng.direction === "INBOUND" ? "Received call from" : "Called";
+            eng.direction === "INBOUND" ? "INBOUND_CALL"
+            : eng.isLogged ? "LOGGED_CALL"
+            : "OUTBOUND_CALL";
+          const callDir = eng.direction === "INBOUND" ? "Received call from"
+            : eng.isLogged ? "Logged call with"
+            : "Called";
           summary = `${callDir} ${lead.name} -- ${eng.disposition || "Unknown"}`;
         }
 
