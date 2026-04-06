@@ -1,0 +1,89 @@
+import { getAllLeadsData, getEmailSubtype } from "../../../lib/leads";
+import { generateLeadSummary } from "../../../lib/sentiment";
+
+export default async function handler(req, res) {
+  const { id } = req.query;
+
+  try {
+    const { leads } = await getAllLeadsData();
+    const lead = leads.find((l) => l.contactId === id);
+
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    // Build detailed engagement timeline
+    const timeline = lead.engagements.map((eng) => {
+      if (eng.type === "EMAIL") {
+        const subtype = getEmailSubtype(eng);
+        return {
+          type: "EMAIL",
+          subtype,
+          direction: eng.direction,
+          timestamp: eng.timestamp,
+          subject: eng.subject,
+          bodyPreview: eng.bodyPreview || "",
+          sentBy: eng.sentBy,
+          loggedFrom: eng.loggedFrom,
+          isAutomated: eng.emailType === "AUTOMATED",
+          label:
+            subtype === "EMAIL_INBOUND"
+              ? "Inbound Email"
+              : subtype === "EMAIL_LOGGED"
+              ? "Logged Email"
+              : eng.emailType === "AUTOMATED"
+              ? "Automated Email"
+              : "Sent Email",
+        };
+      }
+      return {
+        type: "CALL",
+        subtype: eng.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL",
+        direction: eng.direction,
+        timestamp: eng.timestamp,
+        disposition: eng.disposition,
+        durationMs: eng.durationMilliseconds || 0,
+        durationFormatted: eng.durationMilliseconds
+          ? formatDuration(eng.durationMilliseconds)
+          : null,
+        notes: eng.body || "",
+        recordingUrl: eng.recordingUrl,
+        label:
+          eng.direction === "INBOUND"
+            ? `Inbound Call -- ${eng.disposition}`
+            : `Outbound Call -- ${eng.disposition}`,
+      };
+    });
+
+    // Generate AI summary
+    const aiSummary = await generateLeadSummary(lead);
+
+    res.status(200).json({
+      contactId: lead.contactId,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      marina: lead.marina,
+      ownerName: lead.ownerName,
+      createDate: lead.createDate,
+      hubspotUrl: lead.hubspotUrl,
+      responded: lead.responded,
+      speedToLeadMinutes: lead.speedToLeadMinutes,
+      waitingOnReply: lead.waitingOnReply,
+      hasMissedInbound: lead.hasMissedInbound,
+      timeline,
+      aiSummary,
+    });
+  } catch (error) {
+    console.error("Error fetching lead detail:", error);
+    res.status(500).json({ error: "Failed to fetch lead detail" });
+  }
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}

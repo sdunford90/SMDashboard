@@ -3,15 +3,15 @@ import { getAllLeadsData, getEmailSubtype } from "../../lib/leads";
 export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const activities = [];
 
     for (const lead of leads) {
       for (const eng of lead.engagements) {
         const engDate = new Date(eng.timestamp);
-        if (engDate < sevenDaysAgo) continue;
+        if (engDate < thirtyDaysAgo) continue;
 
         let subtype, summary;
         if (eng.type === "EMAIL") {
@@ -37,8 +37,10 @@ export default async function handler(req, res) {
           disposition: eng.disposition || null,
           repName: lead.ownerName,
           leadName: lead.name,
+          contactId: lead.contactId,
           marina: lead.marina,
           summary,
+          bodyPreview: eng.type === "EMAIL" ? (eng.bodyPreview || "") : (eng.body || ""),
           duration:
             eng.type === "CALL" && eng.durationMilliseconds
               ? formatDuration(eng.durationMilliseconds)
@@ -51,7 +53,7 @@ export default async function handler(req, res) {
     // Sort reverse chronological
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    res.status(200).json({ activities: activities.slice(0, 50) });
+    res.status(200).json({ activities: activities.slice(0, 100) });
   } catch (error) {
     console.error("Error fetching activity feed:", error);
     res.status(500).json({ error: "Failed to fetch activity feed" });

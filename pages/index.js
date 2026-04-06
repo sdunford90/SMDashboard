@@ -101,6 +101,9 @@ export default function Dashboard() {
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
   const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all" });
+  const [expandedLead, setExpandedLead] = useState(null);
+  const [leadDetail, setLeadDetail] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const endpoints = [
@@ -144,6 +147,24 @@ export default function Dashboard() {
       await fetchAll();
     } catch {} finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleExpandLead = async (contactId) => {
+    if (expandedLead === contactId) {
+      setExpandedLead(null);
+      setLeadDetail(null);
+      return;
+    }
+    setExpandedLead(contactId);
+    setLeadDetail(null);
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/lead-detail/${contactId}`);
+      const data = await res.json();
+      setLeadDetail(data);
+    } catch {} finally {
+      setLoadingDetail(false);
     }
   };
 
@@ -534,8 +555,12 @@ export default function Dashboard() {
                     </thead>
                     <tbody>
                       {sortedLeads.map((lead) => (
-                        <tr key={lead.contactId} className="border-b hover:bg-gray-50/50">
-                          <td className="px-4 py-3 text-sm font-medium">{lead.name}</td>
+                        <>
+                        <tr key={lead.contactId} className={`border-b hover:bg-gray-50/50 cursor-pointer ${expandedLead === lead.contactId ? "bg-blue-50/40" : ""}`} onClick={() => handleExpandLead(lead.contactId)}>
+                          <td className="px-4 py-3 text-sm font-medium">
+                            <span className="mr-1 text-gray-400 text-xs">{expandedLead === lead.contactId ? "▼" : "▶"}</span>
+                            {lead.name}
+                          </td>
                           <td className="px-4 py-3 text-sm">{lead.marina}</td>
                           <td className="px-4 py-3 text-sm">{lead.ownerName}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">
@@ -559,7 +584,7 @@ export default function Dashboard() {
                             <span title="Inbound">{lead.callsInbound}i</span>{" "}
                             <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <a
                               href={lead.hubspotUrl}
                               target="_blank"
@@ -570,6 +595,14 @@ export default function Dashboard() {
                             </a>
                           </td>
                         </tr>
+                        {expandedLead === lead.contactId && (
+                          <tr key={`${lead.contactId}-detail`}>
+                            <td colSpan={10} className="bg-gray-50 px-0 py-0">
+                              <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
+                            </td>
+                          </tr>
+                        )}
+                        </>
                       ))}
                       {sortedLeads.length === 0 && (
                         <tr>
@@ -588,7 +621,7 @@ export default function Dashboard() {
             <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border overflow-hidden">
               <div className="px-6 py-4 border-b">
                 <h2 className="text-lg font-semibold text-navy">Activity Feed</h2>
-                <p className="text-xs text-gray-400">Last 7 days &middot; auto-refreshes</p>
+                <p className="text-xs text-gray-400">Last 30 days &middot; auto-refreshes</p>
               </div>
               {!activityFeed ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
@@ -622,6 +655,9 @@ export default function Dashboard() {
                           </div>
                           {activity.duration && (
                             <span className="text-xs text-gray-400">{activity.duration}</span>
+                          )}
+                          {activity.bodyPreview && (
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-2 italic">{activity.bodyPreview.slice(0, 150)}{activity.bodyPreview.length > 150 ? "..." : ""}</p>
                           )}
                         </div>
                       </div>
@@ -696,5 +732,124 @@ function ActionTable({ items, columns, renderRow }) {
       </thead>
       <tbody>{items.map(renderRow)}</tbody>
     </table>
+  );
+}
+
+const SENTIMENT_COLORS = {
+  positive: "bg-green-100 text-green-800 border-green-200",
+  neutral: "bg-gray-100 text-gray-800 border-gray-200",
+  negative: "bg-red-100 text-red-800 border-red-200",
+  frustrated: "bg-red-200 text-red-900 border-red-300",
+  unknown: "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+const URGENCY_COLORS = {
+  high: "text-red-600 font-bold",
+  medium: "text-yellow-600 font-semibold",
+  low: "text-green-600",
+  unknown: "text-gray-400",
+};
+
+function LeadDetailPanel({ detail, loading }) {
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 bg-gray-200 rounded w-1/3" />
+          <div className="h-3 bg-gray-200 rounded w-2/3" />
+          <div className="h-3 bg-gray-200 rounded w-1/2" />
+          <div className="h-20 bg-gray-200 rounded w-full mt-4" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) return null;
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* AI Summary Card */}
+      {detail.aiSummary && (
+        <div className="bg-white rounded-lg border p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-navy">AI Analysis</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${SENTIMENT_COLORS[detail.aiSummary.sentiment] || SENTIMENT_COLORS.unknown}`}>
+              {detail.aiSummary.sentiment}
+            </span>
+            <span className={`text-xs ${URGENCY_COLORS[detail.aiSummary.urgency] || URGENCY_COLORS.unknown}`}>
+              {detail.aiSummary.urgency} urgency
+            </span>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed">{detail.aiSummary.summary}</p>
+          {detail.aiSummary.keyTopics?.length > 0 && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {detail.aiSummary.keyTopics.map((topic, i) => (
+                <span key={i} className="bg-navy/10 text-navy text-xs px-2 py-0.5 rounded">{topic}</span>
+              ))}
+            </div>
+          )}
+          {detail.aiSummary.nextStep && (
+            <div className="mt-3 bg-gold/10 border border-gold/30 rounded px-3 py-2">
+              <span className="text-xs font-semibold text-gold">Suggested Next Step: </span>
+              <span className="text-xs text-gray-700">{detail.aiSummary.nextStep}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Engagement Timeline */}
+      <div>
+        <h3 className="text-sm font-semibold text-navy mb-3">Rep Activity Timeline</h3>
+        <div className="space-y-0 border-l-2 border-gray-200 ml-3">
+          {detail.timeline?.map((event, i) => (
+            <div key={i} className="relative pl-6 pb-4">
+              <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
+                event.type === "CALL"
+                  ? event.direction === "INBOUND" ? "bg-orange-400" : "bg-navy"
+                  : event.subtype === "EMAIL_INBOUND" ? "bg-gray-400"
+                  : event.subtype === "EMAIL_LOGGED" ? "bg-purple-500"
+                  : event.isAutomated ? "bg-gray-300"
+                  : "bg-gold"
+              }`} />
+              <div className="bg-white rounded border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {event.type === "CALL" ? (
+                      <svg className="w-3.5 h-3.5 text-navy" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
+                    )}
+                    <span className="text-sm font-medium">{event.label}</span>
+                    {event.durationFormatted && (
+                      <span className="text-xs text-gray-400">({event.durationFormatted})</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                    {new Date(event.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                {event.subject && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    <span className="font-medium">Subject:</span> {event.subject}
+                  </p>
+                )}
+                {event.bodyPreview && (
+                  <p className="text-xs text-gray-500 mt-1 italic line-clamp-3">{event.bodyPreview}</p>
+                )}
+                {event.notes && (
+                  <p className="text-xs text-gray-500 mt-1 italic line-clamp-3">{event.notes}</p>
+                )}
+                {event.sentBy && (
+                  <p className="text-xs text-gray-400 mt-1">From: {event.sentBy}</p>
+                )}
+              </div>
+            </div>
+          ))}
+          {(!detail.timeline || detail.timeline.length === 0) && (
+            <p className="pl-6 text-sm text-gray-400">No engagement activity found.</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
