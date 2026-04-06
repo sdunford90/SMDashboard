@@ -1,0 +1,14 @@
+run = "npm run dev"
+
+[nix]
+channel = "stable-23_11"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[deployment]
+run = ["sh", "-c", "npm run start"]
+
+[env]
+PORT = "3000"
