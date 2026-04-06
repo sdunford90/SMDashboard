@@ -278,7 +278,7 @@ export default function Dashboard() {
           )}
 
           {/* Action Queue */}
-          {!actionQueue ? (
+          {!actionQueue?.counts ? (
             <LoadingSkeleton height="h-64" />
           ) : (
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
