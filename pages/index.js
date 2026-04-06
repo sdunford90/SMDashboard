@@ -279,7 +279,7 @@ export default function Dashboard() {
 
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
           {/* Summary Bar */}
-          {!leads ? (
+          {!leads?.leads ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
                 <LoadingSkeleton key={i} height="h-24" />
@@ -414,7 +414,7 @@ export default function Dashboard() {
                   ))}
                 </select>
               </div>
-              {!speedData ? (
+              {!speedData?.data ? (
                 <LoadingSkeleton height="h-64" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
@@ -464,7 +464,7 @@ export default function Dashboard() {
                   <option value={90}>Last 90 days</option>
                 </select>
               </div>
-              {!callData ? (
+              {!callData?.chartData ? (
                 <LoadingSkeleton height="h-64" />
               ) : (
                 <>
@@ -523,7 +523,7 @@ export default function Dashboard() {
                   ))}
                 </select>
               </div>
-              {!leads ? (
+              {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
               ) : (
                 <div className="overflow-x-auto">
@@ -624,7 +624,7 @@ export default function Dashboard() {
                 <h2 className="text-lg font-semibold text-navy">Activity Feed</h2>
                 <p className="text-xs text-gray-400">Last 30 days &middot; auto-refreshes</p>
               </div>
-              {!activityFeed ? (
+              {!activityFeed?.activities ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
               ) : (
                 <div className="max-h-[600px] overflow-y-auto divide-y">
