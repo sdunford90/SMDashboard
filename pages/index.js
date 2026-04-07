@@ -38,6 +38,7 @@ const ResponsiveContainer = dynamic(
   () => import("recharts").then((mod) => mod.ResponsiveContainer),
   { ssr: false }
 );
+const Cell = dynamic(() => import("recharts").then((mod) => mod.Cell), { ssr: false });
 
 const MARINA_COLORS = [
   "#0c2340", "#c4933f", "#2563eb", "#dc2626", "#16a34a",
@@ -211,6 +212,14 @@ export default function Dashboard() {
     summaryMarina === "all"
       ? (actionQueue?.counts?.missedCalls || 0) + (actionQueue?.counts?.waitingOnReply || 0)
       : summaryLeads.filter((l) => l.hasMissedInbound || l.waitingOnReply).length;
+
+  // Per-marina conversion rate (for calls breakdown table)
+  const marinaConversionMap = {};
+  for (const lead of (leads?.leads || [])) {
+    if (!marinaConversionMap[lead.marina]) marinaConversionMap[lead.marina] = { total: 0, converted: 0 };
+    marinaConversionMap[lead.marina].total += 1;
+    if (lead.isCustomer) marinaConversionMap[lead.marina].converted += 1;
+  }
 
   // Filtered marinas list
   const allMarinas = leads?.leads
@@ -687,6 +696,8 @@ export default function Dashboard() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Total Leads</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Conv %</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Inbound</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Outbound</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Connected Rate</th>
@@ -700,6 +711,21 @@ export default function Dashboard() {
                         .map((row) => (
                           <tr key={row.marina} className="border-b hover:bg-gray-50/50">
                             <td className="px-5 py-3 text-sm font-medium">{row.marina}</td>
+                            <td className="px-5 py-3 text-sm text-center text-gray-600">
+                              {marinaConversionMap[row.marina]?.total ?? "--"}
+                            </td>
+                            <td className="px-5 py-3 text-sm text-center">
+                              {(() => {
+                                const m = marinaConversionMap[row.marina];
+                                if (!m || m.total === 0) return <span className="text-gray-400">--</span>;
+                                const pct = Math.round((m.converted / m.total) * 100);
+                                return (
+                                  <span className={`font-semibold ${pct >= 20 ? "text-emerald-600" : pct >= 10 ? "text-yellow-600" : "text-gray-500"}`}>
+                                    {pct}%
+                                  </span>
+                                );
+                              })()}
+                            </td>
                             <td className="px-5 py-3 text-sm text-center">
                               <span className="font-semibold text-gold">{row.totalInbound}</span>
                             </td>
@@ -723,56 +749,60 @@ export default function Dashboard() {
 
           {/* ── LEADS TAB ──────────────────────────────── */}
           {pageTab === "leads" && (<>
-            {/* Speed to Lead Chart */}
+            {/* Speed to Lead Chart — horizontal bar per marina */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-navy">Speed to Lead Trend</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Business hours (Mon–Fri 9am–5pm ET) · by week</p>
-                </div>
-                <select
-                  value={marinaFilter}
-                  onChange={(e) => setMarinaFilter(e.target.value)}
-                  className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none"
-                >
-                  <option value="all">All Marinas</option>
-                  {speedData?.marinas?.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-navy">Avg Speed to Lead by Property</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Business hours (Mon–Fri 9am–5pm ET) · fastest to slowest</p>
               </div>
-              {!speedData?.data ? (
+              {!speedData?.marinaSummary ? (
                 <LoadingSkeleton height="h-64" />
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={speedData.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" tick={{ fontSize: 11 }} />
-                    <YAxis
+                <ResponsiveContainer width="100%" height={Math.max(280, speedData.marinaSummary.length * 36)}>
+                  <BarChart
+                    data={speedData.marinaSummary}
+                    layout="vertical"
+                    margin={{ left: 16, right: 48, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis
+                      type="number"
                       tick={{ fontSize: 11 }}
                       tickFormatter={(v) => formatSpeedToLead(v)}
                     />
-                    <Tooltip
-                      formatter={(value) => [formatSpeedToLead(value), ""]}
-                      labelFormatter={(label) => `Week: ${label}`}
+                    <YAxis
+                      type="category"
+                      dataKey="marina"
+                      tick={{ fontSize: 12 }}
+                      width={110}
                     />
-                    <Legend />
-                    {(marinaFilter === "all"
-                      ? speedData.marinas
-                      : [marinaFilter]
-                    ).map((marina, i) => (
-                      <Line
-                        key={marina}
-                        type="monotone"
-                        dataKey={marina}
-                        stroke={MARINA_COLORS[i % MARINA_COLORS.length]}
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        connectNulls
-                      />
-                    ))}
-                  </LineChart>
+                    <Tooltip
+                      formatter={(value) => [formatSpeedToLead(value), "Avg Speed to Lead"]}
+                      cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                    />
+                    <Bar dataKey="avgBizMinutes" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v) => formatSpeedToLead(v) }}>
+                      {speedData.marinaSummary.map((entry) => (
+                        <Cell
+                          key={entry.marina}
+                          fill={
+                            entry.avgBizMinutes < 60
+                              ? "#16a34a"
+                              : entry.avgBizMinutes <= 240
+                              ? "#ca8a04"
+                              : "#dc2626"
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
+              )}
+              {speedData?.marinaSummary && (
+                <div className="flex items-center gap-5 mt-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-600"></span>Under 1 hour</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-600"></span>1–4 hours</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-red-600"></span>Over 4 hours</span>
+                </div>
               )}
             </div>
 
