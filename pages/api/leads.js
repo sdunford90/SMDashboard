@@ -31,10 +31,10 @@ export default async function handler(req, res) {
       callsLogged: lead.callsLogged,
       lastTouch: lead.lastTouch,
       hubspotUrl: lead.hubspotUrl,
-      analyticsSource: lead.analyticsSource,
-      analyticsSourceData1: lead.analyticsSourceData1,
-      isPowerAutomate: lead.isPowerAutomate,
-      status: lead.hasMissedInbound
+      isCustomer: lead.isCustomer,
+      status: lead.isCustomer
+        ? "Converted"
+        : lead.hasMissedInbound
         ? "Missed Call"
         : lead.waitingOnReply
         ? "Waiting on Reply"

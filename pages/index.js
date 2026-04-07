@@ -72,6 +72,7 @@ function speedToLeadColor(minutes) {
 
 function StatusBadge({ status }) {
   const styles = {
+    Converted: "bg-emerald-100 text-emerald-800 border-emerald-200",
     "Missed Call": "bg-red-100 text-red-800 border-red-200",
     "Waiting on Reply": "bg-orange-100 text-orange-800 border-orange-200",
     Responded: "bg-green-100 text-green-800 border-green-200",
@@ -105,7 +106,7 @@ export default function Dashboard() {
   const [callDays, setCallDays] = useState(30);
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
-  const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all", source: "all" });
+  const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all" });
   const [expandedLead, setExpandedLead] = useState(null);
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -198,8 +199,6 @@ export default function Dashboard() {
   const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
     if (tableFilter.rep !== "all" && l.ownerName !== tableFilter.rep) return false;
-    if (tableFilter.source === "power-automate" && !l.isPowerAutomate) return false;
-    if (tableFilter.source === "web" && l.isPowerAutomate) return false;
     return true;
   });
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -526,15 +525,6 @@ export default function Dashboard() {
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
-                <select
-                  value={tableFilter.source}
-                  onChange={(e) => setTableFilter((f) => ({ ...f, source: e.target.value }))}
-                  className="text-xs border rounded px-2 py-1"
-                >
-                  <option value="all">All Sources</option>
-                  <option value="power-automate">Power Automate</option>
-                  <option value="web">Web / Organic</option>
-                </select>
               </div>
               {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
@@ -559,7 +549,6 @@ export default function Dashboard() {
                             <SortIcon col={col} />
                           </th>
                         ))}
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Source</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
@@ -582,13 +571,6 @@ export default function Dashboard() {
                           </td>
                           <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadMinutes)}`}>
                             {lead.speedToLeadFormatted}
-                          </td>
-                          <td className="px-4 py-3">
-                            {lead.isPowerAutomate ? (
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">⚡ Power Automate</span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">{lead.analyticsSource ? lead.analyticsSource.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : "Web"}</span>
-                            )}
                           </td>
                           <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
                           <td className="px-4 py-3 text-xs text-gray-500">
