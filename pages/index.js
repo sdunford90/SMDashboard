@@ -89,6 +89,20 @@ function StatusBadge({ status }) {
   );
 }
 
+function urgencyRowStyle(urgency) {
+  if (urgency === "critical") return "border-b border-l-4 border-l-red-500 hover:bg-red-50/40";
+  if (urgency === "high") return "border-b border-l-4 border-l-orange-400 hover:bg-orange-50/30";
+  if (urgency === "medium") return "border-b border-l-4 border-l-yellow-400 hover:bg-yellow-50/30";
+  return "border-b border-l-4 border-l-gray-200 hover:bg-gray-50/30";
+}
+
+function urgencyAgeStyle(urgency) {
+  if (urgency === "critical") return "text-red-600 font-semibold";
+  if (urgency === "high") return "text-orange-500 font-semibold";
+  if (urgency === "medium") return "text-yellow-600 font-medium";
+  return "text-gray-500";
+}
+
 function SortIconBase({ col, tableSort }) {
   if (tableSort.col !== col) return <span className="text-gray-300 ml-1">&#x25B4;&#x25BE;</span>;
   return tableSort.dir === "asc" ? <span className="ml-1">&#x25B4;</span> : <span className="ml-1">&#x25BE;</span>;
@@ -323,6 +337,13 @@ export default function Dashboard() {
                   count={actionQueue.counts.neverResponded}
                   color="yellow"
                 />
+                <TabButton
+                  active={activeTab === "unresponded"}
+                  onClick={() => setActiveTab("unresponded")}
+                  label="All Unresponded"
+                  count={actionQueue.counts.allUnresponded}
+                  color="red"
+                />
               </div>
               <div className="overflow-x-auto">
                 {activeTab === "missed" && (
@@ -387,6 +408,56 @@ export default function Dashboard() {
                       </tr>
                     )}
                   />
+                )}
+                {activeTab === "unresponded" && (
+                  <div>
+                    {/* Urgency legend */}
+                    <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 border-b text-xs text-gray-500">
+                      <span className="font-medium text-gray-600">Urgency:</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-500"></span> Over 24h</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-orange-400"></span> 4–24h</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span> 1–4h</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-gray-200"></span> Under 1h</span>
+                    </div>
+                    <ActionTable
+                      items={actionQueue.allUnresponded}
+                      columns={["Lead", "Marina", "Waiting Since", "Signals", "Phone", ""]}
+                      renderRow={(item) => (
+                        <tr key={item.contactId} className={urgencyRowStyle(item.urgency)}>
+                          <td className="px-4 py-3 font-medium text-sm">
+                            {item.name}
+                            {item.hasMissedInbound && (
+                              <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs">Missed Call</span>
+                            )}
+                            {item.waitingOnReply && !item.hasMissedInbound && (
+                              <span className="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Awaiting Reply</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm">{item.marina}</td>
+                          <td className={`px-4 py-3 text-sm ${urgencyAgeStyle(item.urgency)}`}>
+                            {timeAgo(item.createDate)}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500">
+                            {item.emailsSent > 0 && <span className="mr-2">{item.emailsSent} email{item.emailsSent !== 1 ? "s" : ""}</span>}
+                            {item.callsOutbound > 0 && <span>{item.callsOutbound} call attempt{item.callsOutbound !== 1 ? "s" : ""}</span>}
+                            {!item.emailsSent && !item.callsOutbound && <span className="italic">No outreach yet</span>}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {item.phone ? (
+                              <a href={`tel:${item.phone}`} className="text-blue-600 hover:underline font-medium">
+                                {item.phone}
+                              </a>
+                            ) : "--"}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium whitespace-nowrap">
+                              Open in HubSpot
+                            </a>
+                          </td>
+                        </tr>
+                      )}
+                    />
+                  </div>
                 )}
               </div>
             </div>

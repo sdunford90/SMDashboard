@@ -68,16 +68,46 @@ export default async function handler(req, res) {
       }))
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
 
+    // All unresponded: every lead where rep has not yet made a meaningful response
+    const allUnresponded = leads
+      .filter((l) => !l.responded)
+      .map((l) => {
+        const ageMs = now - new Date(l.createDate);
+        const ageMinutes = ageMs / (1000 * 60);
+        const ageHours = ageMinutes / 60;
+        const ageDays = Math.floor(ageHours / 24);
+        let urgency;
+        if (ageHours < 1) urgency = "low";
+        else if (ageHours < 4) urgency = "medium";
+        else if (ageHours < 24) urgency = "high";
+        else urgency = "critical";
+        return {
+          ...formatLead(l),
+          ageMinutes,
+          ageDays,
+          urgency,
+          hasMissedInbound: l.hasMissedInbound,
+          waitingOnReply: l.waitingOnReply,
+          callsOutbound: l.callsOutbound,
+          callsInbound: l.callsInbound,
+          emailsSent: l.emailsSent,
+          lastTouch: l.lastTouch,
+        };
+      })
+      .sort((a, b) => b.ageMinutes - a.ageMinutes);
+
     res.status(200).json({
       missedCalls,
       waitingOnReply,
       multipleNoAnswer,
       neverResponded,
+      allUnresponded,
       counts: {
         missedCalls: missedCalls.length,
         waitingOnReply: waitingOnReply.length,
         multipleNoAnswer: multipleNoAnswer.length,
         neverResponded: neverResponded.length,
+        allUnresponded: allUnresponded.length,
       },
     });
   } catch (error) {
