@@ -106,7 +106,7 @@ export default function Dashboard() {
   const [callDays, setCallDays] = useState(30);
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
-  const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all" });
+  const [tableFilter, setTableFilter] = useState({ marina: "all" });
   const [expandedLead, setExpandedLead] = useState(null);
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -191,14 +191,9 @@ export default function Dashboard() {
   const allMarinas = leads?.leads
     ? [...new Set(leads.leads.map((l) => l.marina))].sort()
     : [];
-  const allReps = leads?.leads
-    ? [...new Set(leads.leads.map((l) => l.ownerName))].sort()
-    : [];
-
   // Sorted / filtered leads table
   const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
-    if (tableFilter.rep !== "all" && l.ownerName !== tableFilter.rep) return false;
     return true;
   });
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -333,12 +328,11 @@ export default function Dashboard() {
                 {activeTab === "missed" && (
                   <ActionTable
                     items={actionQueue.missedCalls}
-                    columns={["Lead", "Marina", "Rep", "Missed Call Time", "Attempts", "Phone", ""]}
+                    columns={["Lead", "Marina", "Missed Call Time", "Attempts", "Phone", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-red-50/30">
                         <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
-                        <td className="px-4 py-3 text-sm">{item.ownerName}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.missedCallTime)}</td>
                         <td className="px-4 py-3 text-sm">{item.attempts}</td>
                         <td className="px-4 py-3 text-sm">
@@ -360,12 +354,11 @@ export default function Dashboard() {
                 {activeTab === "waiting" && (
                   <ActionTable
                     items={actionQueue.waitingOnReply}
-                    columns={["Lead", "Marina", "Rep", "Waiting Since", "Last Inbound", ""]}
+                    columns={["Lead", "Marina", "Waiting Since", "Last Inbound", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-orange-50/30">
                         <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
-                        <td className="px-4 py-3 text-sm">{item.ownerName}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.waitingSince)}</td>
                         <td className="px-4 py-3 text-sm capitalize">{item.lastInboundType?.replace(/_/g, " ").toLowerCase()}</td>
                         <td className="px-4 py-3 text-sm">
@@ -380,12 +373,11 @@ export default function Dashboard() {
                 {activeTab === "never" && (
                   <ActionTable
                     items={actionQueue.neverResponded}
-                    columns={["Lead", "Marina", "Rep", "Time Since Created", ""]}
+                    columns={["Lead", "Marina", "Time Since Created", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-yellow-50/30">
                         <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
-                        <td className="px-4 py-3 text-sm">{item.ownerName}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.createDate)}</td>
                         <td className="px-4 py-3 text-sm">
                           <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium">
@@ -515,16 +507,6 @@ export default function Dashboard() {
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
-                <select
-                  value={tableFilter.rep}
-                  onChange={(e) => setTableFilter((f) => ({ ...f, rep: e.target.value }))}
-                  className="text-xs border rounded px-2 py-1"
-                >
-                  <option value="all">All Reps</option>
-                  {allReps.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
               </div>
               {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
@@ -536,7 +518,6 @@ export default function Dashboard() {
                         {[
                           { col: "name", label: "Name" },
                           { col: "marina", label: "Marina" },
-                          { col: "ownerName", label: "Rep" },
                           { col: "createDate", label: "Created" },
                           { col: "speedToLeadMinutes", label: "Speed to Lead" },
                         ].map(({ col, label }) => (
@@ -563,9 +544,11 @@ export default function Dashboard() {
                           <td className="px-4 py-3 text-sm font-medium">
                             <span className="mr-1 text-gray-400 text-xs">{expandedLead === lead.contactId ? "▼" : "▶"}</span>
                             {lead.name}
+                            {lead.isBoatClub && (
+                              <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Boat Club</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm">{lead.marina}</td>
-                          <td className="px-4 py-3 text-sm">{lead.ownerName}</td>
                           <td className="px-4 py-3 text-sm text-gray-500">
                             {new Date(lead.createDate).toLocaleDateString()}
                           </td>
@@ -601,7 +584,7 @@ export default function Dashboard() {
                         </tr>
                         {expandedLead === lead.contactId && (
                           <tr key={`${lead.contactId}-detail`}>
-                            <td colSpan={10} className="bg-gray-50 px-0 py-0">
+                            <td colSpan={9} className="bg-gray-50 px-0 py-0">
                               <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
                             </td>
                           </tr>
@@ -610,7 +593,7 @@ export default function Dashboard() {
                       ))}
                       {sortedLeads.length === 0 && (
                         <tr>
-                          <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm">
+                          <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">
                             No leads found
                           </td>
                         </tr>
