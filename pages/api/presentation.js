@@ -23,9 +23,12 @@ export default async function handler(req, res) {
     const speedByProperty = marinas
       .map((marina) => {
         const ml = leads7Days.filter((l) => l.marina === marina);
-        const responded = ml.filter((l) => l.speedToLeadMinutes !== null);
+        const responded = ml.filter((l) => l.speedToLeadBizMinutes !== null || l.speedToLeadMinutes !== null);
+        const withBiz = ml.filter((l) => l.speedToLeadBizMinutes !== null);
         const avg =
-          responded.length > 0
+          withBiz.length > 0
+            ? withBiz.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / withBiz.length
+            : responded.length > 0
             ? responded.reduce((s, l) => s + l.speedToLeadMinutes, 0) / responded.length
             : null;
         return {

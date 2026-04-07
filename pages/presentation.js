@@ -137,7 +137,7 @@ export default function Presentation() {
                     {/* Table */}
                     <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
                       <div className="px-5 py-3 border-b border-white/10">
-                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Speed to Lead by Property — Last 7 Days</h3>
+                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Speed to Lead by Property — Last 7 Days (Business Hours)</h3>
                       </div>
                       <table className="w-full text-sm">
                         <thead>

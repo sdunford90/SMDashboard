@@ -43,9 +43,11 @@ export default async function handler(req, res) {
           return year === w.year && week === w.week;
         });
         if (marinaLeads.length > 0) {
+          const withBiz = marinaLeads.filter((l) => l.speedToLeadBizMinutes !== null);
           const avg =
-            marinaLeads.reduce((sum, l) => sum + l.speedToLeadMinutes, 0) /
-            marinaLeads.length;
+            withBiz.length > 0
+              ? withBiz.reduce((sum, l) => sum + l.speedToLeadBizMinutes, 0) / withBiz.length
+              : marinaLeads.reduce((sum, l) => sum + l.speedToLeadMinutes, 0) / marinaLeads.length;
           row[marina] = Math.round(avg * 10) / 10;
         } else {
           row[marina] = null;

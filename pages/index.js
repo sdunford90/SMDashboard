@@ -127,6 +127,7 @@ export default function Dashboard() {
   const [expandedLead, setExpandedLead] = useState(null);
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [pageTab, setPageTab] = useState("overview");
 
   const fetchAll = useCallback(async () => {
     const endpoints = [
@@ -201,10 +202,10 @@ export default function Dashboard() {
   const totalLeads = summaryLeads.length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
-  const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadMinutes !== null);
+  const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadBizMinutes !== null);
   const avgSpeed =
     avgSpeedLeads.length > 0
-      ? avgSpeedLeads.reduce((s, l) => s + l.speedToLeadMinutes, 0) / avgSpeedLeads.length
+      ? avgSpeedLeads.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / avgSpeedLeads.length
       : null;
   const waitingCount =
     summaryMarina === "all"
@@ -310,7 +311,33 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* Page-level Tab Navigation */}
+        <div className="bg-white border-b shadow-sm">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 flex gap-0">
+            {[
+              { id: "overview", label: "Overview" },
+              { id: "calls", label: "Calls by Property" },
+              { id: "leads", label: "All Leads" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setPageTab(tab.id)}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  pageTab === tab.id
+                    ? "border-gold text-navy"
+                    : "border-transparent text-gray-500 hover:text-navy hover:border-gray-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+          {/* ── OVERVIEW TAB ──────────────────────────────── */}
+          {pageTab === "overview" && (<>
           {/* Summary Bar */}
           {!leads?.leads ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -336,7 +363,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard label={summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`} value={totalLeads} />
                 <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
-                <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} />
+                <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} sub="business hours" />
                 <StatCard
                   label="Waiting Now"
                   value={waitingCount}
@@ -583,12 +610,126 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          </>)}
+
+          {/* ── CALLS TAB ──────────────────────────────── */}
+          {pageTab === "calls" && (<>
+            {/* KPI Summary */}
+            {!callData?.marinaStats ? (
+              <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => <LoadingSkeleton key={i} height="h-24" />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard
+                  label="Total Inbound"
+                  value={Object.values(callData.marinaStats).reduce((s, m) => s + m.totalInbound, 0)}
+                />
+                <StatCard
+                  label="Total Outbound"
+                  value={Object.values(callData.marinaStats).reduce((s, m) => s + m.totalOutbound, 0)}
+                />
+                <StatCard
+                  label="Outbound Connected"
+                  value={`${Math.round(
+                    (Object.values(callData.marinaStats).reduce((s, m) => s + (m.connectedRate * m.totalOutbound / 100), 0) /
+                    Math.max(1, Object.values(callData.marinaStats).reduce((s, m) => s + m.totalOutbound, 0))) * 100
+                  )}%`}
+                  sub="connection rate"
+                />
+                <div className={`bg-white rounded-xl shadow-sm border p-5 flex items-center justify-end`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Period:</span>
+                    <select
+                      value={callDays}
+                      onChange={(e) => setCallDays(Number(e.target.value))}
+                      className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none"
+                    >
+                      <option value={7}>Last 7 days</option>
+                      <option value={30}>Last 30 days</option>
+                      <option value={90}>Last 90 days</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bar Chart */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-navy mb-4">Inbound vs Outbound by Property</h2>
+              {!callData?.chartData ? (
+                <LoadingSkeleton height="h-72" />
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={callData.chartData} margin={{ bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="marina" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" height={70} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend verticalAlign="top" />
+                    <Bar dataKey="inbound" fill="#c4933f" name="Inbound" radius={[3,3,0,0]} />
+                    <Bar dataKey="outbound" fill="#0c2340" name="Outbound" radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Detail Table by Property */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-lg font-semibold text-navy">Breakdown by Property</h2>
+              </div>
+              {!callData?.marinas ? (
+                <div className="p-6"><LoadingSkeleton height="h-48" /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Inbound</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Outbound</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Connected Rate</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Avg Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {callData.marinas
+                        .map((marina) => ({ marina, ...callData.marinaStats[marina] }))
+                        .sort((a, b) => (b.totalInbound + b.totalOutbound) - (a.totalInbound + a.totalOutbound))
+                        .map((row) => (
+                          <tr key={row.marina} className="border-b hover:bg-gray-50/50">
+                            <td className="px-5 py-3 text-sm font-medium">{row.marina}</td>
+                            <td className="px-5 py-3 text-sm text-center">
+                              <span className="font-semibold text-gold">{row.totalInbound}</span>
+                            </td>
+                            <td className="px-5 py-3 text-sm text-center">
+                              <span className="font-semibold text-navy">{row.totalOutbound}</span>
+                            </td>
+                            <td className="px-5 py-3 text-sm text-center">
+                              <span className={`font-semibold ${row.connectedRate >= 40 ? "text-green-600" : row.connectedRate >= 20 ? "text-yellow-600" : "text-red-500"}`}>
+                                {row.connectedRate}%
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-sm text-center text-gray-500">{row.avgDurationFormatted}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>)}
+
+          {/* ── LEADS TAB ──────────────────────────────── */}
+          {pageTab === "leads" && (<>
             {/* Speed to Lead Chart */}
-            <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border p-6">
+            <div className="bg-white rounded-xl shadow-sm border p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-navy">Speed to Lead</h2>
+                <div>
+                  <h2 className="text-lg font-semibold text-navy">Speed to Lead Trend</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Business hours (Mon–Fri 9am–5pm ET) · by week</p>
+                </div>
                 <select
                   value={marinaFilter}
                   onChange={(e) => setMarinaFilter(e.target.value)}
@@ -609,7 +750,6 @@ export default function Dashboard() {
                     <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                     <YAxis
                       tick={{ fontSize: 11 }}
-                      label={{ value: "Hours", angle: -90, position: "insideLeft", fontSize: 12 }}
                       tickFormatter={(v) => formatSpeedToLead(v)}
                     />
                     <Tooltip
@@ -636,230 +776,188 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Call Activity Panel */}
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-navy">Call Activity</h2>
-                <select
-                  value={callDays}
-                  onChange={(e) => setCallDays(Number(e.target.value))}
-                  className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none"
-                >
-                  <option value={7}>Last 7 days</option>
-                  <option value={30}>Last 30 days</option>
-                  <option value={90}>Last 90 days</option>
-                </select>
-              </div>
-              {!callData?.chartData ? (
-                <LoadingSkeleton height="h-64" />
-              ) : (
-                <>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={callData.chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="marina" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="inbound" fill="#c4933f" name="Inbound" />
-                      <Bar dataKey="outbound" fill="#0c2340" name="Outbound" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <div className="mt-4 space-y-2 max-h-32 overflow-y-auto">
-                    {callData.marinas?.map((marina) => {
-                      const stats = callData.marinaStats[marina];
-                      return (
-                        <div key={marina} className="flex justify-between text-xs border-b pb-1">
-                          <span className="font-medium truncate max-w-[120px]">{marina}</span>
-                          <span>{stats.totalOutbound} attempts</span>
-                          <span>{stats.connectedRate}% conn.</span>
-                          <span>{stats.avgDurationFormatted} avg</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Leads Table + Activity Feed */}
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-            {/* Full Leads Table */}
-            <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="px-6 py-4 border-b flex flex-wrap items-center gap-3">
-                <h2 className="text-lg font-semibold text-navy mr-auto">All Leads</h2>
-                <select
-                  value={tableFilter.marina}
-                  onChange={(e) => setTableFilter((f) => ({ ...f, marina: e.target.value }))}
-                  className="text-xs border rounded px-2 py-1"
-                >
-                  <option value="all">All Marinas</option>
-                  {allMarinas.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              {!leads?.leads ? (
-                <div className="p-6"><LoadingSkeleton height="h-64" /></div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {[
-                          { col: "name", label: "Name" },
-                          { col: "marina", label: "Marina" },
-                          { col: "createDate", label: "Created" },
-                          { col: "speedToLeadMinutes", label: "Speed to Lead" },
-                        ].map(({ col, label }) => (
-                          <th
-                            key={col}
-                            className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:text-navy select-none"
-                            onClick={() => handleSort(col)}
-                          >
-                            {label}
-                            <SortIcon col={col} />
-                          </th>
-                        ))}
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Calls</th>
-                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedLeads.map((lead) => (
-                        <React.Fragment key={lead.contactId}>
-                        <tr className={`border-b hover:bg-gray-50/50 cursor-pointer ${expandedLead === lead.contactId ? "bg-blue-50/40" : ""}`} onClick={() => handleExpandLead(lead.contactId)}>
-                          <td className="px-4 py-3 text-sm font-medium">
-                            <span className="mr-1 text-gray-400 text-xs">{expandedLead === lead.contactId ? "▼" : "▶"}</span>
-                            {lead.name}
-                            {lead.isBoatClub && (
-                              <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Boat Club</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm">{lead.marina}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
-                            {new Date(lead.createDate).toLocaleDateString()}
-                          </td>
-                          <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadMinutes)}`}>
-                            {lead.speedToLeadFormatted}
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge status={lead.status} />
-                            {lead.isCustomer && lead.convertedAt && (
-                              <div className="text-xs text-emerald-600 mt-0.5 whitespace-nowrap">
-                                {new Date(lead.convertedAt).toLocaleDateString()}
-                                {lead.daysToConvert !== null && (
-                                  <span className="ml-1 font-medium">· {lead.daysToConvert}d</span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-500">
-                            {lead.lastTouch
-                              ? `${lead.lastTouch.subtype?.replace(/_/g, " ").toLowerCase()} ${timeAgo(lead.lastTouch.timestamp)}`
-                              : "--"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            <span title="Sent">{lead.emailsSent}s</span>{" "}
-                            <span title="Logged">{lead.emailsLogged}l</span>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            <span title="Outbound">{lead.callsOutbound}o</span>{" "}
-                            <span title="Inbound">{lead.callsInbound}i</span>{" "}
-                            <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>{" "}
-                            {lead.callsLogged > 0 && <span title="Logged" className="text-purple-600">{lead.callsLogged}lg</span>}
-                          </td>
-                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                            <a
-                              href={lead.hubspotUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-gold hover:underline text-xs font-medium whitespace-nowrap"
+            {/* Leads Table + Activity Feed */}
+            <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+              {/* Full Leads Table */}
+              <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="px-6 py-4 border-b flex flex-wrap items-center gap-3">
+                  <h2 className="text-lg font-semibold text-navy mr-auto">All Leads</h2>
+                  <select
+                    value={tableFilter.marina}
+                    onChange={(e) => setTableFilter((f) => ({ ...f, marina: e.target.value }))}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="all">All Marinas</option>
+                    {allMarinas.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                {!leads?.leads ? (
+                  <div className="p-6"><LoadingSkeleton height="h-64" /></div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {[
+                            { col: "name", label: "Name" },
+                            { col: "marina", label: "Marina" },
+                            { col: "createDate", label: "Created" },
+                            { col: "speedToLeadMinutes", label: "Speed to Lead" },
+                          ].map(({ col, label }) => (
+                            <th
+                              key={col}
+                              className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer hover:text-navy select-none"
+                              onClick={() => handleSort(col)}
                             >
-                              HubSpot
-                            </a>
-                          </td>
+                              {label}
+                              <SortIcon col={col} />
+                            </th>
+                          ))}
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Calls</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase"></th>
                         </tr>
-                        {expandedLead === lead.contactId && (
-                          <tr key={`${lead.contactId}-detail`}>
-                            <td colSpan={9} className="bg-gray-50 px-0 py-0">
-                              <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
+                      </thead>
+                      <tbody>
+                        {sortedLeads.map((lead) => (
+                          <React.Fragment key={lead.contactId}>
+                          <tr className={`border-b hover:bg-gray-50/50 cursor-pointer ${expandedLead === lead.contactId ? "bg-blue-50/40" : ""}`} onClick={() => handleExpandLead(lead.contactId)}>
+                            <td className="px-4 py-3 text-sm font-medium">
+                              <span className="mr-1 text-gray-400 text-xs">{expandedLead === lead.contactId ? "▼" : "▶"}</span>
+                              {lead.name}
+                              {lead.isBoatClub && (
+                                <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Boat Club</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">{lead.marina}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {new Date(lead.createDate).toLocaleDateString()}
+                            </td>
+                            <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadBizMinutes ?? lead.speedToLeadMinutes)}`}>
+                              {lead.speedToLeadBizFormatted || lead.speedToLeadFormatted}
+                              {lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined && (
+                                <span className="ml-1 text-xs font-normal text-gray-400">biz</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={lead.status} />
+                              {lead.isCustomer && lead.convertedAt && (
+                                <div className="text-xs text-emerald-600 mt-0.5 whitespace-nowrap">
+                                  {new Date(lead.convertedAt).toLocaleDateString()}
+                                  {lead.daysToConvert !== null && (
+                                    <span className="ml-1 font-medium">· {lead.daysToConvert}d</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-500">
+                              {lead.lastTouch
+                                ? `${lead.lastTouch.subtype?.replace(/_/g, " ").toLowerCase()} ${timeAgo(lead.lastTouch.timestamp)}`
+                                : "--"}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              <span title="Sent">{lead.emailsSent}s</span>{" "}
+                              <span title="Logged">{lead.emailsLogged}l</span>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              <span title="Outbound">{lead.callsOutbound}o</span>{" "}
+                              <span title="Inbound">{lead.callsInbound}i</span>{" "}
+                              <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>{" "}
+                              {lead.callsLogged > 0 && <span title="Logged" className="text-purple-600">{lead.callsLogged}lg</span>}
+                            </td>
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                              <a
+                                href={lead.hubspotUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-gold hover:underline text-xs font-medium whitespace-nowrap"
+                              >
+                                HubSpot
+                              </a>
+                            </td>
+                          </tr>
+                          {expandedLead === lead.contactId && (
+                            <tr key={`${lead.contactId}-detail`}>
+                              <td colSpan={9} className="bg-gray-50 px-0 py-0">
+                                <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
+                        ))}
+                        {sortedLeads.length === 0 && (
+                          <tr>
+                            <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">
+                              No leads found
                             </td>
                           </tr>
                         )}
-                        </React.Fragment>
-                      ))}
-                      {sortedLeads.length === 0 && (
-                        <tr>
-                          <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">
-                            No leads found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Activity Feed */}
-            <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-navy">Activity Feed</h2>
-                <p className="text-xs text-gray-400">Last 30 days &middot; auto-refreshes</p>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-              {!activityFeed?.activities ? (
-                <div className="p-6"><LoadingSkeleton height="h-64" /></div>
-              ) : (
-                <div className="max-h-[600px] overflow-y-auto divide-y">
-                  {activityFeed.activities?.map((activity, i) => (
-                    <div key={i} className="px-4 py-3 hover:bg-gray-50/50">
-                      <div className="flex items-start gap-3">
-                        <span className={`text-lg mt-0.5 ${
-                          activity.type === "CALL" ? "text-navy" : "text-gold"
-                        }`}>
-                          {activity.type === "CALL" ? (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                            </svg>
-                          )}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{activity.summary}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-gray-500">{activity.repName}</span>
-                            <span className="text-xs text-gray-300">&middot;</span>
-                            <span className="text-xs text-gray-400">{activity.marina}</span>
-                            <span className="text-xs text-gray-300">&middot;</span>
-                            <span className="text-xs text-gray-400">{timeAgo(activity.timestamp)}</span>
+
+              {/* Activity Feed */}
+              <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="px-6 py-4 border-b">
+                  <h2 className="text-lg font-semibold text-navy">Activity Feed</h2>
+                  <p className="text-xs text-gray-400">Last 30 days &middot; auto-refreshes</p>
+                </div>
+                {!activityFeed?.activities ? (
+                  <div className="p-6"><LoadingSkeleton height="h-64" /></div>
+                ) : (
+                  <div className="max-h-[600px] overflow-y-auto divide-y">
+                    {activityFeed.activities?.map((activity, i) => (
+                      <div key={i} className="px-4 py-3 hover:bg-gray-50/50">
+                        <div className="flex items-start gap-3">
+                          <span className={`text-lg mt-0.5 ${
+                            activity.type === "CALL" ? "text-navy" : "text-gold"
+                          }`}>
+                            {activity.type === "CALL" ? (
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                              </svg>
+                            )}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{activity.summary}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">{activity.repName}</span>
+                              <span className="text-xs text-gray-300">&middot;</span>
+                              <span className="text-xs text-gray-400">{activity.marina}</span>
+                              <span className="text-xs text-gray-300">&middot;</span>
+                              <span className="text-xs text-gray-400">{timeAgo(activity.timestamp)}</span>
+                            </div>
+                            {activity.duration && (
+                              <span className="text-xs text-gray-400">{activity.duration}</span>
+                            )}
+                            {activity.bodyPreview && (
+                              <p className="text-xs text-gray-400 mt-1 line-clamp-2 italic">{activity.bodyPreview.slice(0, 150)}{activity.bodyPreview.length > 150 ? "..." : ""}</p>
+                            )}
                           </div>
-                          {activity.duration && (
-                            <span className="text-xs text-gray-400">{activity.duration}</span>
-                          )}
-                          {activity.bodyPreview && (
-                            <p className="text-xs text-gray-400 mt-1 line-clamp-2 italic">{activity.bodyPreview.slice(0, 150)}{activity.bodyPreview.length > 150 ? "..." : ""}</p>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  {activityFeed.activities?.length === 0 && (
-                    <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                      No recent activity
-                    </div>
-                  )}
-                </div>
-              )}
+                    ))}
+                    {activityFeed.activities?.length === 0 && (
+                      <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                        No recent activity
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </>)}
         </main>
       </div>
     </>

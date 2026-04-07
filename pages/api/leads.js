@@ -19,6 +19,8 @@ export default async function handler(req, res) {
       firstResponseTime: lead.firstResponseTime,
       speedToLeadMinutes: lead.speedToLeadMinutes,
       speedToLeadFormatted: formatSpeedToLead(lead.speedToLeadMinutes),
+      speedToLeadBizMinutes: lead.speedToLeadBizMinutes,
+      speedToLeadBizFormatted: formatSpeedToLead(lead.speedToLeadBizMinutes),
       waitingOnReply: lead.waitingOnReply,
       waitingSince: lead.waitingSince,
       hasMissedInbound: lead.hasMissedInbound,
