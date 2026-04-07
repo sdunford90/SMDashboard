@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
 import dynamic from "next/dynamic";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -88,6 +88,11 @@ function StatusBadge({ status }) {
   );
 }
 
+function SortIconBase({ col, tableSort }) {
+  if (tableSort.col !== col) return <span className="text-gray-300 ml-1">&#x25B4;&#x25BE;</span>;
+  return tableSort.dir === "asc" ? <span className="ml-1">&#x25B4;</span> : <span className="ml-1">&#x25BE;</span>;
+}
+
 export default function Dashboard() {
   const [leads, setLeads] = useState(null);
   const [speedData, setSpeedData] = useState(null);
@@ -100,7 +105,7 @@ export default function Dashboard() {
   const [callDays, setCallDays] = useState(30);
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
-  const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all" });
+  const [tableFilter, setTableFilter] = useState({ marina: "all", rep: "all", source: "all" });
   const [expandedLead, setExpandedLead] = useState(null);
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -193,6 +198,8 @@ export default function Dashboard() {
   const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
     if (tableFilter.rep !== "all" && l.ownerName !== tableFilter.rep) return false;
+    if (tableFilter.source === "power-automate" && !l.isPowerAutomate) return false;
+    if (tableFilter.source === "web" && l.isPowerAutomate) return false;
     return true;
   });
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -223,10 +230,7 @@ export default function Dashboard() {
     );
   };
 
-  const SortIcon = ({ col }) => {
-    if (tableSort.col !== col) return <span className="text-gray-300 ml-1">&#x25B4;&#x25BE;</span>;
-    return tableSort.dir === "asc" ? <span className="ml-1">&#x25B4;</span> : <span className="ml-1">&#x25BE;</span>;
-  };
+  const SortIcon = ({ col }) => <SortIconBase col={col} tableSort={tableSort} />;
 
   return (
     <>
@@ -522,6 +526,15 @@ export default function Dashboard() {
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+                <select
+                  value={tableFilter.source}
+                  onChange={(e) => setTableFilter((f) => ({ ...f, source: e.target.value }))}
+                  className="text-xs border rounded px-2 py-1"
+                >
+                  <option value="all">All Sources</option>
+                  <option value="power-automate">Power Automate</option>
+                  <option value="web">Web / Organic</option>
+                </select>
               </div>
               {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-64" /></div>
@@ -546,6 +559,7 @@ export default function Dashboard() {
                             <SortIcon col={col} />
                           </th>
                         ))}
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Source</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
@@ -555,8 +569,8 @@ export default function Dashboard() {
                     </thead>
                     <tbody>
                       {sortedLeads.map((lead) => (
-                        <>
-                        <tr key={lead.contactId} className={`border-b hover:bg-gray-50/50 cursor-pointer ${expandedLead === lead.contactId ? "bg-blue-50/40" : ""}`} onClick={() => handleExpandLead(lead.contactId)}>
+                        <React.Fragment key={lead.contactId}>
+                        <tr className={`border-b hover:bg-gray-50/50 cursor-pointer ${expandedLead === lead.contactId ? "bg-blue-50/40" : ""}`} onClick={() => handleExpandLead(lead.contactId)}>
                           <td className="px-4 py-3 text-sm font-medium">
                             <span className="mr-1 text-gray-400 text-xs">{expandedLead === lead.contactId ? "▼" : "▶"}</span>
                             {lead.name}
@@ -568,6 +582,13 @@ export default function Dashboard() {
                           </td>
                           <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadMinutes)}`}>
                             {lead.speedToLeadFormatted}
+                          </td>
+                          <td className="px-4 py-3">
+                            {lead.isPowerAutomate ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">⚡ Power Automate</span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">{lead.analyticsSource ? lead.analyticsSource.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : "Web"}</span>
+                            )}
                           </td>
                           <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
                           <td className="px-4 py-3 text-xs text-gray-500">
@@ -603,7 +624,7 @@ export default function Dashboard() {
                             </td>
                           </tr>
                         )}
-                        </>
+                        </React.Fragment>
                       ))}
                       {sortedLeads.length === 0 && (
                         <tr>
