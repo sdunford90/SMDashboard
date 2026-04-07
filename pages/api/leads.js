@@ -32,6 +32,8 @@ export default async function handler(req, res) {
       lastTouch: lead.lastTouch,
       hubspotUrl: lead.hubspotUrl,
       isCustomer: lead.isCustomer,
+      convertedAt: lead.convertedAt || null,
+      daysToConvert: lead.daysToConvert !== undefined ? lead.daysToConvert : null,
       status: lead.isCustomer
         ? "Converted"
         : lead.hasMissedInbound

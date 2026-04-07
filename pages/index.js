@@ -746,7 +746,17 @@ export default function Dashboard() {
                           <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadMinutes)}`}>
                             {lead.speedToLeadFormatted}
                           </td>
-                          <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={lead.status} />
+                            {lead.isCustomer && lead.convertedAt && (
+                              <div className="text-xs text-emerald-600 mt-0.5 whitespace-nowrap">
+                                {new Date(lead.convertedAt).toLocaleDateString()}
+                                {lead.daysToConvert !== null && (
+                                  <span className="ml-1 font-medium">· {lead.daysToConvert}d</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-xs text-gray-500">
                             {lead.lastTouch
                               ? `${lead.lastTouch.subtype?.replace(/_/g, " ").toLowerCase()} ${timeAgo(lead.lastTouch.timestamp)}`
