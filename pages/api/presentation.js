@@ -71,6 +71,36 @@ export default async function handler(req, res) {
       .filter((m) => m.total > 0)
       .sort((a, b) => b.total - a.total);
 
+    // Conversions
+    const converted = leads.filter((l) => l.isCustomer);
+    const withDays = converted.filter((l) => l.daysToConvert !== null);
+    const conversionTotal = converted.length;
+    const conversionAvgDays =
+      withDays.length > 0
+        ? Math.round(withDays.reduce((s, l) => s + l.daysToConvert, 0) / withDays.length)
+        : null;
+    const conversionFastest =
+      withDays.length > 0 ? Math.min(...withDays.map((l) => l.daysToConvert)) : null;
+
+    const marinaConvMap = {};
+    for (const lead of converted) {
+      if (!marinaConvMap[lead.marina]) {
+        marinaConvMap[lead.marina] = { count: 0, totalDays: 0, withDays: 0 };
+      }
+      marinaConvMap[lead.marina].count++;
+      if (lead.daysToConvert !== null) {
+        marinaConvMap[lead.marina].totalDays += lead.daysToConvert;
+        marinaConvMap[lead.marina].withDays++;
+      }
+    }
+    const conversionsByMarina = Object.entries(marinaConvMap)
+      .map(([marina, stats]) => ({
+        marina,
+        count: stats.count,
+        avgDays: stats.withDays > 0 ? Math.round(stats.totalDays / stats.withDays) : null,
+      }))
+      .sort((a, b) => b.count - a.count);
+
     res.status(200).json({
       newLeads7Days,
       monthlyLeads,
@@ -78,6 +108,10 @@ export default async function handler(req, res) {
       speedByProperty,
       newLeadsByProperty,
       callsByLocation,
+      conversionTotal,
+      conversionAvgDays,
+      conversionFastest,
+      conversionsByMarina,
       generatedAt: now.toISOString(),
     });
   } catch (err) {

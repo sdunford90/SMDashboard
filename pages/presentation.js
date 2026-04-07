@@ -26,7 +26,7 @@ function speedBarColor(minutes) {
   return "#f87171";
 }
 
-const SLIDES = ["overview", "calls"];
+const SLIDES = ["overview", "calls", "conversions"];
 
 export default function Presentation() {
   const [data, setData] = useState(null);
@@ -278,6 +278,104 @@ export default function Presentation() {
                           </tbody>
                         </table>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* SLIDE 3: Conversions */}
+              {slide === 2 && (
+                <div className="flex-1 px-8 py-6 flex flex-col gap-6">
+                  <h2 className="text-2xl font-bold text-[#c4933f] tracking-wide">
+                    Conversions — Leads to Customers
+                  </h2>
+
+                  {/* KPI row */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                    <KpiCard
+                      label="Total Conversions"
+                      value={data.conversionTotal ?? 0}
+                      accent="text-emerald-400"
+                    />
+                    <KpiCard
+                      label="Avg Days to Convert"
+                      value={data.conversionAvgDays !== null ? `${data.conversionAvgDays}d` : "--"}
+                      accent="text-blue-400"
+                    />
+                    <KpiCard
+                      label="Fastest Conversion"
+                      value={data.conversionFastest !== null ? `${data.conversionFastest}d` : "--"}
+                      accent="text-[#c4933f]"
+                      small
+                    />
+                  </div>
+
+                  {/* Breakdown table */}
+                  <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-white/10">
+                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Conversions by Property</h3>
+                      </div>
+                      {!data.conversionsByMarina || data.conversionsByMarina.length === 0 ? (
+                        <div className="px-5 py-6 text-center text-white/30">No conversion data</div>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
+                              <th className="px-5 py-2 text-left">Property</th>
+                              <th className="px-5 py-2 text-right">Conversions</th>
+                              <th className="px-5 py-2 text-right">Avg Days</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.conversionsByMarina.map((row) => (
+                              <tr key={row.marina} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="px-5 py-2.5 font-medium">{row.marina}</td>
+                                <td className="px-5 py-2.5 text-right text-emerald-400 font-bold">{row.count}</td>
+                                <td className="px-5 py-2.5 text-right text-white/60">
+                                  {row.avgDays !== null ? `${row.avgDays}d` : "--"}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="border-t border-white/20 font-bold">
+                              <td className="px-5 py-3 text-white/60 text-xs uppercase tracking-wide">Total</td>
+                              <td className="px-5 py-3 text-right text-emerald-400">
+                                {data.conversionsByMarina.reduce((s, r) => s + r.count, 0)}
+                              </td>
+                              <td className="px-5 py-3 text-right text-white/60"></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    {/* Bar chart */}
+                    <div className="bg-white/5 rounded-xl border border-white/10 p-5 flex flex-col">
+                      <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest mb-4">Conversions by Property</h3>
+                      <div className="flex-1 min-h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={data.conversionsByMarina || []}
+                            margin={{ top: 5, right: 10, left: 0, bottom: 60 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis
+                              dataKey="marina"
+                              tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                              angle={-40}
+                              textAnchor="end"
+                              height={70}
+                            />
+                            <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} allowDecimals={false} />
+                            <Tooltip
+                              contentStyle={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8 }}
+                              labelStyle={{ color: "#fff" }}
+                              itemStyle={{ color: "#34d399" }}
+                              formatter={(v) => [v, "Conversions"]}
+                            />
+                            <Bar dataKey="count" name="Conversions" radius={[4, 4, 0, 0]} fill="#34d399" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 </div>

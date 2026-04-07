@@ -115,6 +115,7 @@ export default function Dashboard() {
   const [actionQueue, setActionQueue] = useState(null);
   const [callData, setCallData] = useState(null);
   const [activityFeed, setActivityFeed] = useState(null);
+  const [conversionData, setConversionData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("missed");
@@ -134,8 +135,9 @@ export default function Dashboard() {
       fetch("/api/action-queue").then((r) => r.json()),
       fetch(`/api/calls?days=${callDays}`).then((r) => r.json()),
       fetch("/api/activity-feed").then((r) => r.json()),
+      fetch("/api/conversions").then((r) => r.json()),
     ];
-    const [leadsRes, speedRes, queueRes, callsRes, feedRes] =
+    const [leadsRes, speedRes, queueRes, callsRes, feedRes, convRes] =
       await Promise.allSettled(endpoints);
 
     if (leadsRes.status === "fulfilled") setLeads(leadsRes.value);
@@ -143,6 +145,7 @@ export default function Dashboard() {
     if (queueRes.status === "fulfilled") setActionQueue(queueRes.value);
     if (callsRes.status === "fulfilled") setCallData(callsRes.value);
     if (feedRes.status === "fulfilled") setActivityFeed(feedRes.value);
+    if (convRes.status === "fulfilled") setConversionData(convRes.value);
     setLastUpdated(new Date());
   }, [callDays]);
 
@@ -495,6 +498,90 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Conversions Panel */}
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="px-6 py-4 border-b flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-navy mr-auto">Conversions</h2>
+              <span className="text-xs text-gray-400">Time from lead to customer</span>
+            </div>
+            {!conversionData ? (
+              <div className="p-6"><LoadingSkeleton height="h-32" /></div>
+            ) : (
+              <div>
+                {/* KPI cards */}
+                <div className="grid grid-cols-3 divide-x border-b">
+                  <div className="px-6 py-4 text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Total Converted</p>
+                    <p className="text-3xl font-bold text-emerald-600">{conversionData.total ?? 0}</p>
+                  </div>
+                  <div className="px-6 py-4 text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Avg Days to Convert</p>
+                    <p className="text-3xl font-bold text-navy">
+                      {conversionData.avgDays !== null ? `${conversionData.avgDays}d` : "--"}
+                    </p>
+                  </div>
+                  <div className="px-6 py-4 text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Fastest Conversion</p>
+                    <p className="text-3xl font-bold text-gold">
+                      {conversionData.fastest !== null ? `${conversionData.fastest}d` : "--"}
+                    </p>
+                  </div>
+                </div>
+                {/* Converted leads table */}
+                {conversionData.leads && conversionData.leads.length > 0 ? (
+                  <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Name</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Marina</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Created</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Converted</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Days to Convert</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {conversionData.leads.map((lead) => (
+                          <tr key={lead.contactId} className="border-b hover:bg-emerald-50/30">
+                            <td className="px-4 py-3 text-sm font-medium">
+                              {lead.name}
+                              <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">Converted</span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{lead.marina}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {lead.createDate ? new Date(lead.createDate).toLocaleDateString() : "--"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : "--"}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-emerald-600">
+                              {lead.daysToConvert !== null ? `${lead.daysToConvert}d` : "--"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <a
+                                href={lead.hubspotUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-gold hover:underline text-xs font-medium whitespace-nowrap"
+                              >
+                                HubSpot
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="px-6 py-6 text-center text-gray-400 text-sm">
+                    No conversions yet in the tracked period
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
