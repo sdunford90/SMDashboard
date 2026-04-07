@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 
@@ -117,6 +118,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("missed");
+  const [summaryMarina, setSummaryMarina] = useState("all");
   const [callDays, setCallDays] = useState(30);
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
@@ -188,18 +190,23 @@ export default function Dashboard() {
     }
   };
 
-  // Summary calculations
-  const totalLeads = leads?.total || 0;
-  const respondedCount = leads?.leads?.filter((l) => l.responded).length || 0;
+  // Summary calculations — filtered by summaryMarina
+  const summaryLeads =
+    summaryMarina === "all"
+      ? (leads?.leads || [])
+      : (leads?.leads || []).filter((l) => l.marina === summaryMarina);
+  const totalLeads = summaryLeads.length;
+  const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
-  const avgSpeed = leads?.leads?.length
-    ? leads.leads
-        .filter((l) => l.speedToLeadMinutes !== null)
-        .reduce((sum, l, _, arr) => sum + l.speedToLeadMinutes / arr.length, 0)
-    : null;
+  const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadMinutes !== null);
+  const avgSpeed =
+    avgSpeedLeads.length > 0
+      ? avgSpeedLeads.reduce((s, l) => s + l.speedToLeadMinutes, 0) / avgSpeedLeads.length
+      : null;
   const waitingCount =
-    (actionQueue?.counts?.missedCalls || 0) +
-    (actionQueue?.counts?.waitingOnReply || 0);
+    summaryMarina === "all"
+      ? (actionQueue?.counts?.missedCalls || 0) + (actionQueue?.counts?.waitingOnReply || 0)
+      : summaryLeads.filter((l) => l.hasMissedInbound || l.waitingOnReply).length;
 
   // Filtered marinas list
   const allMarinas = leads?.leads
@@ -266,6 +273,17 @@ export default function Dashboard() {
                 Last updated: {timeAgo(lastUpdated)}
               </span>
             )}
+            <Link
+              href="/presentation"
+              target="_blank"
+              rel="noreferrer"
+              className="border border-gold/50 hover:border-gold text-gold px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+              Present
+            </Link>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -298,15 +316,30 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard label="Total Leads" value={totalLeads} />
-              <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
-              <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} />
-              <StatCard
-                label="Waiting Now"
-                value={waitingCount}
-                highlight={waitingCount > 0}
-              />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Filter by property:</span>
+                <select
+                  value={summaryMarina}
+                  onChange={(e) => setSummaryMarina(e.target.value)}
+                  className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none bg-white"
+                >
+                  <option value="all">All Properties</option>
+                  {allMarinas.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard label={summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`} value={totalLeads} />
+                <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
+                <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} />
+                <StatCard
+                  label="Waiting Now"
+                  value={waitingCount}
+                  highlight={waitingCount > 0}
+                />
+              </div>
             </div>
           )}
 
