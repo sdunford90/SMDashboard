@@ -213,6 +213,14 @@ export default function Dashboard() {
       ? (actionQueue?.counts?.missedCalls || 0) + (actionQueue?.counts?.waitingOnReply || 0)
       : summaryLeads.filter((l) => l.hasMissedInbound || l.waitingOnReply).length;
 
+  // Marina-filtered action queue (respects the Overview property filter)
+  const filterByMarina = (arr) =>
+    summaryMarina === "all" ? (arr || []) : (arr || []).filter((i) => i.marina === summaryMarina);
+  const filteredMissedCalls = filterByMarina(actionQueue?.missedCalls);
+  const filteredWaitingOnReply = filterByMarina(actionQueue?.waitingOnReply);
+  const filteredNeverResponded = filterByMarina(actionQueue?.neverResponded);
+  const filteredAllUnresponded = filterByMarina(actionQueue?.allUnresponded);
+
   // Per-marina conversion rate (for calls breakdown table)
   const marinaConversionMap = {};
   for (const lead of (leads?.leads || [])) {
@@ -392,35 +400,35 @@ export default function Dashboard() {
                   active={activeTab === "missed"}
                   onClick={() => setActiveTab("missed")}
                   label="Missed Inbound Calls"
-                  count={actionQueue.counts.missedCalls}
+                  count={filteredMissedCalls.length}
                   color="red"
                 />
                 <TabButton
                   active={activeTab === "waiting"}
                   onClick={() => setActiveTab("waiting")}
                   label="Waiting on Reply"
-                  count={actionQueue.counts.waitingOnReply}
+                  count={filteredWaitingOnReply.length}
                   color="orange"
                 />
                 <TabButton
                   active={activeTab === "never"}
                   onClick={() => setActiveTab("never")}
                   label="Never Responded"
-                  count={actionQueue.counts.neverResponded}
+                  count={filteredNeverResponded.length}
                   color="yellow"
                 />
                 <TabButton
                   active={activeTab === "unresponded"}
                   onClick={() => setActiveTab("unresponded")}
                   label="All Unresponded"
-                  count={actionQueue.counts.allUnresponded}
+                  count={filteredAllUnresponded.length}
                   color="red"
                 />
               </div>
               <div className="overflow-x-auto">
                 {activeTab === "missed" && (
                   <ActionTable
-                    items={actionQueue.missedCalls}
+                    items={filteredMissedCalls}
                     columns={["Lead", "Marina", "Missed Call Time", "Attempts", "Phone", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-red-50/30">
@@ -446,7 +454,7 @@ export default function Dashboard() {
                 )}
                 {activeTab === "waiting" && (
                   <ActionTable
-                    items={actionQueue.waitingOnReply}
+                    items={filteredWaitingOnReply}
                     columns={["Lead", "Marina", "Waiting Since", "Last Inbound", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-orange-50/30">
@@ -465,7 +473,7 @@ export default function Dashboard() {
                 )}
                 {activeTab === "never" && (
                   <ActionTable
-                    items={actionQueue.neverResponded}
+                    items={filteredNeverResponded}
                     columns={["Lead", "Marina", "Time Since Created", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-yellow-50/30">
@@ -492,7 +500,7 @@ export default function Dashboard() {
                       <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-gray-200"></span> Under 1h</span>
                     </div>
                     <ActionTable
-                      items={actionQueue.allUnresponded}
+                      items={filteredAllUnresponded}
                       columns={["Lead", "Marina", "Waiting Since", "Signals", "Phone", ""]}
                       renderRow={(item) => (
                         <tr key={item.contactId} className={urgencyRowStyle(item.urgency)}>
@@ -546,6 +554,8 @@ export default function Dashboard() {
             ) : (() => {
               const sourceMap = {};
               for (const lead of leads.leads) {
+                if (lead.marina === "Unknown") continue;
+                if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
                 if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
                 sourceMap[lead.marina][lead.leadSource] = (sourceMap[lead.marina][lead.leadSource] || 0) + 1;
               }
@@ -577,29 +587,36 @@ export default function Dashboard() {
             </div>
             {!conversionData ? (
               <div className="p-6"><LoadingSkeleton height="h-32" /></div>
-            ) : (
+            ) : (() => {
+              const convLeads = summaryMarina === "all"
+                ? (conversionData.leads || [])
+                : (conversionData.leads || []).filter((l) => l.marina === summaryMarina);
+              const withDays = convLeads.filter((l) => l.daysToConvert !== null);
+              const convAvgDays = withDays.length > 0 ? Math.round(withDays.reduce((s, l) => s + l.daysToConvert, 0) / withDays.length) : null;
+              const convFastest = withDays.length > 0 ? Math.min(...withDays.map((l) => l.daysToConvert)) : null;
+              return (
               <div>
                 {/* KPI cards */}
                 <div className="grid grid-cols-3 divide-x border-b">
                   <div className="px-6 py-4 text-center">
                     <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Total Converted</p>
-                    <p className="text-3xl font-bold text-emerald-600">{conversionData.total ?? 0}</p>
+                    <p className="text-3xl font-bold text-emerald-600">{convLeads.length}</p>
                   </div>
                   <div className="px-6 py-4 text-center">
                     <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Avg Days to Convert</p>
                     <p className="text-3xl font-bold text-navy">
-                      {conversionData.avgDays !== null ? `${conversionData.avgDays}d` : "--"}
+                      {convAvgDays !== null ? `${convAvgDays}d` : "--"}
                     </p>
                   </div>
                   <div className="px-6 py-4 text-center">
                     <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Fastest Conversion</p>
                     <p className="text-3xl font-bold text-gold">
-                      {conversionData.fastest !== null ? `${conversionData.fastest}d` : "--"}
+                      {convFastest !== null ? `${convFastest}d` : "--"}
                     </p>
                   </div>
                 </div>
                 {/* Converted leads table */}
-                {conversionData.leads && conversionData.leads.length > 0 ? (
+                {convLeads.length > 0 ? (
                   <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
                     <table className="w-full text-left">
                       <thead className="bg-gray-50 sticky top-0">
@@ -613,7 +630,7 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {conversionData.leads.map((lead) => (
+                        {convLeads.map((lead) => (
                           <tr key={lead.contactId} className="border-b hover:bg-emerald-50/30">
                             <td className="px-4 py-3 text-sm font-medium">
                               {lead.name}
@@ -650,7 +667,8 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
 
           </>)}
