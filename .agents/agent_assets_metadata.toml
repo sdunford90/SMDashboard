@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Pi1wwpBSbzIXKeBqRnWAu"
+uri = "file://public/missing-marina2-contacts.csv"
+type = "table"
+title = "Contacts Missing marina_location_2 (2026)"
