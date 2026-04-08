@@ -535,6 +535,40 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Lead Sources by Property */}
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-navy">Lead Count by Property</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Inbound calls · web form submissions · digital / other</p>
+            </div>
+            {!leads?.leads ? (
+              <LoadingSkeleton height="h-64" />
+            ) : (() => {
+              const sourceMap = {};
+              for (const lead of leads.leads) {
+                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
+                sourceMap[lead.marina][lead.leadSource] = (sourceMap[lead.marina][lead.leadSource] || 0) + 1;
+              }
+              const chartData = Object.entries(sourceMap)
+                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) }))
+                .sort((a, b) => b.total - a.total);
+              return (
+                <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
+                  <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 48, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="marina" tick={{ fontSize: 12 }} width={110} />
+                    <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                    <Legend verticalAlign="top" />
+                    <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" radius={[0,0,0,0]} />
+                    <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" radius={[0,0,0,0]} />
+                    <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()}
+          </div>
+
           {/* Conversions Panel */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
             <div className="px-6 py-4 border-b flex items-center gap-3">
