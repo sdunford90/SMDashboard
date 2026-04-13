@@ -17,6 +17,17 @@ export default async function handler(req, res) {
     const monthlyLeads = leadsThisMonth.length;
     const totalLeads = leads.length;
 
+    function srcCounts(arr) {
+      return {
+        Call:     arr.filter((l) => l.leadSource === "Call").length,
+        WebForm:  arr.filter((l) => l.leadSource === "Web Form").length,
+        Digital:  arr.filter((l) => l.leadSource !== "Call" && l.leadSource !== "Web Form").length,
+      };
+    }
+    const srcAll     = srcCounts(leads);
+    const src7Days   = srcCounts(leads7Days);
+    const srcMonth   = srcCounts(leadsThisMonth);
+
     const marinas = [...new Set(leads.map((l) => l.marina))].sort();
 
     // Speed to lead by property (last 7 days)
@@ -128,6 +139,9 @@ export default async function handler(req, res) {
       newLeads7Days,
       monthlyLeads,
       totalLeads,
+      src7Days,
+      srcMonth,
+      srcAll,
       speedByProperty,
       newLeadsByProperty,
       callsByLocation,

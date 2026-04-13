@@ -214,6 +214,9 @@ export default function Dashboard() {
     (l) => summaryMarina === "all" || l.marina === summaryMarina
   );
   const totalLeads = summaryLeads.length;
+  const sourceCallCount    = summaryLeads.filter((l) => l.leadSource === "Call").length;
+  const sourceFormCount    = summaryLeads.filter((l) => l.leadSource === "Web Form").length;
+  const sourceDigitalCount = summaryLeads.filter((l) => l.leadSource !== "Call" && l.leadSource !== "Web Form").length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
   const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadBizMinutes !== null);
@@ -421,7 +424,25 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label={summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`} value={totalLeads} sub={dateWindow === "all" ? "Since Jan 1" : `Last ${dateWindow} days`} />
+                {/* Total Leads with source breakdown */}
+                <div className="bg-white rounded-xl shadow-sm border p-5">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                    {summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`}
+                  </p>
+                  <p className="text-2xl font-bold mt-1 text-navy">{totalLeads}</p>
+                  <p className="text-xs text-gray-400 mt-1">{dateWindow === "all" ? "Since Jan 1" : `Last ${dateWindow} days`}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy">
+                      📞 {sourceCallCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gold/10 text-yellow-700">
+                      📋 {sourceFormCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
+                      🌐 {sourceDigitalCount}
+                    </span>
+                  </div>
+                </div>
                 <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
                 <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} sub="business hours" />
                 <StatCard

@@ -118,17 +118,20 @@ export default function Presentation() {
                       label="New Leads — Last 7 Days"
                       value={data.newLeads7Days}
                       accent="text-[#c4933f]"
+                      src={data.src7Days}
                     />
                     <KpiCard
                       label={`Total Leads — ${monthName}`}
                       value={data.monthlyLeads}
                       accent="text-blue-400"
+                      src={data.srcMonth}
                     />
                     <KpiCard
                       label="Total Leads (All Time)"
                       value={data.totalLeads}
                       accent="text-white/60"
                       small
+                      src={data.srcAll}
                     />
                   </div>
 
@@ -521,11 +524,23 @@ export default function Presentation() {
   );
 }
 
-function KpiCard({ label, value, accent = "text-[#c4933f]", small = false }) {
+function SourcePills({ src }) {
+  if (!src) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-3">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-white/80">📞 {src.Call ?? 0}</span>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#c4933f]/20 text-[#c4933f]">📋 {src.WebForm ?? 0}</span>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300">🌐 {src.Digital ?? 0}</span>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, accent = "text-[#c4933f]", small = false, src }) {
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5">
       <div className="text-white/50 text-xs uppercase tracking-widest mb-2">{label}</div>
       <div className={`font-bold ${small ? "text-4xl" : "text-6xl"} ${accent}`}>{value}</div>
+      {src && <SourcePills src={src} />}
     </div>
   );
 }
