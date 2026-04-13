@@ -74,6 +74,26 @@ export default async function handler(req, res) {
       .filter((m) => m.total > 0)
       .sort((a, b) => b.total - a.total);
 
+    // Lead source breakdown (all-time, all marinas)
+    const sourceCount = { Call: 0, "Web Form": 0, Digital: 0 };
+    const sourceByMarina = {};
+    for (const lead of leads) {
+      const src = lead.leadSource || "Digital";
+      sourceCount[src] = (sourceCount[src] || 0) + 1;
+      if (!sourceByMarina[lead.marina]) sourceByMarina[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
+      sourceByMarina[lead.marina][src] = (sourceByMarina[lead.marina][src] || 0) + 1;
+    }
+    const leadSourceByMarina = Object.entries(sourceByMarina)
+      .map(([marina, counts]) => ({
+        marina,
+        Call: counts.Call || 0,
+        "Web Form": counts["Web Form"] || 0,
+        Digital: counts.Digital || 0,
+        total: (counts.Call || 0) + (counts["Web Form"] || 0) + (counts.Digital || 0),
+      }))
+      .filter((m) => m.total > 0)
+      .sort((a, b) => b.total - a.total);
+
     // Conversions
     const converted = leads.filter((l) => l.isCustomer);
     const withDays = converted.filter((l) => l.daysToConvert !== null);
@@ -115,6 +135,8 @@ export default async function handler(req, res) {
       conversionAvgDays,
       conversionFastest,
       conversionsByMarina,
+      sourceCount,
+      leadSourceByMarina,
       generatedAt: now.toISOString(),
     });
   } catch (err) {

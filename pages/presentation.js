@@ -26,7 +26,7 @@ function speedBarColor(minutes) {
   return "#f87171";
 }
 
-const SLIDES = ["overview", "calls", "conversions"];
+const SLIDES = ["overview", "calls", "conversions", "sources"];
 
 export default function Presentation() {
   const [data, setData] = useState(null);
@@ -137,7 +137,7 @@ export default function Presentation() {
                     {/* Table */}
                     <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
                       <div className="px-5 py-3 border-b border-white/10">
-                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Speed to Lead by Property — Last 7 Days (Business Hours)</h3>
+                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Speed to Lead by Property — Last 7 Days (9am–5pm, 7 days/wk)</h3>
                       </div>
                       <table className="w-full text-sm">
                         <thead>
@@ -282,6 +282,100 @@ export default function Presentation() {
                   </div>
                 </div>
               )}
+              {/* SLIDE 4: Lead Sources */}
+              {slide === 3 && (
+                <div className="flex-1 px-8 py-6 flex flex-col gap-6">
+                  <h2 className="text-2xl font-bold text-[#c4933f] tracking-wide">
+                    Lead Sources — Where Leads Come From
+                  </h2>
+
+                  {/* Summary KPI row */}
+                  <div className="grid grid-cols-3 gap-5">
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
+                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">📞 Calls / Walk-ins</div>
+                      <div className="text-5xl font-bold text-[#0c2340] bg-white/90 rounded-lg py-2">{data.sourceCount?.Call ?? 0}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
+                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">📋 Web Forms</div>
+                      <div className="text-5xl font-bold text-[#c4933f] bg-white/10 rounded-lg py-2">{data.sourceCount?.["Web Form"] ?? 0}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
+                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">🌐 Digital / Other</div>
+                      <div className="text-5xl font-bold text-blue-400 bg-white/10 rounded-lg py-2">{data.sourceCount?.Digital ?? 0}</div>
+                    </div>
+                  </div>
+
+                  {/* Stacked bar chart by marina */}
+                  <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div className="bg-white/5 rounded-xl border border-white/10 p-5 flex flex-col">
+                      <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest mb-4">Lead Source by Property</h3>
+                      <div className="flex-1 min-h-[240px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={data.leadSourceByMarina || []}
+                            layout="vertical"
+                            margin={{ top: 4, right: 40, left: 8, bottom: 4 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
+                            <XAxis type="number" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} allowDecimals={false} />
+                            <YAxis type="category" dataKey="marina" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }} width={115} />
+                            <Tooltip
+                              contentStyle={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8 }}
+                              labelStyle={{ color: "#fff" }}
+                            />
+                            <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12, paddingTop: 8 }} />
+                            <Bar dataKey="Call" name="Call / Walk-in" stackId="a" fill="#0c2340" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                            <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" />
+                            <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0, 4, 4, 0]}
+                              label={{ position: "right", fill: "rgba(255,255,255,0.5)", fontSize: 11, formatter: (v, e) => e?.payload?.total }} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-white/10">
+                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Source Breakdown by Property</h3>
+                      </div>
+                      <div className="overflow-y-auto" style={{ maxHeight: 320 }}>
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-[#0c2340]">
+                            <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
+                              <th className="px-5 py-2 text-left">Property</th>
+                              <th className="px-5 py-2 text-right text-white/70">📞 Call</th>
+                              <th className="px-5 py-2 text-right text-[#c4933f]">📋 Form</th>
+                              <th className="px-5 py-2 text-right text-blue-400">🌐 Digital</th>
+                              <th className="px-5 py-2 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(data.leadSourceByMarina || []).map((row) => (
+                              <tr key={row.marina} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="px-5 py-2.5 font-medium">{row.marina}</td>
+                                <td className="px-5 py-2.5 text-right font-semibold text-white/80">{row.Call}</td>
+                                <td className="px-5 py-2.5 text-right font-semibold text-[#c4933f]">{row["Web Form"]}</td>
+                                <td className="px-5 py-2.5 text-right font-semibold text-blue-400">{row.Digital}</td>
+                                <td className="px-5 py-2.5 text-right text-white/50">{row.total}</td>
+                              </tr>
+                            ))}
+                            <tr className="border-t border-white/20 font-bold">
+                              <td className="px-5 py-3 text-white/60 text-xs uppercase tracking-wide">Total</td>
+                              <td className="px-5 py-3 text-right text-white/80">{data.sourceCount?.Call ?? 0}</td>
+                              <td className="px-5 py-3 text-right text-[#c4933f]">{data.sourceCount?.["Web Form"] ?? 0}</td>
+                              <td className="px-5 py-3 text-right text-blue-400">{data.sourceCount?.Digital ?? 0}</td>
+                              <td className="px-5 py-3 text-right text-white">
+                                {(data.sourceCount?.Call ?? 0) + (data.sourceCount?.["Web Form"] ?? 0) + (data.sourceCount?.Digital ?? 0)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* SLIDE 3: Conversions */}
               {slide === 2 && (
                 <div className="flex-1 px-8 py-6 flex flex-col gap-6">

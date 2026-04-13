@@ -56,6 +56,7 @@ export default async function handler(req, res) {
         contactId: l.contactId,
         name: l.name,
         marina: l.marina,
+        leadSource: l.leadSource,
         createDate: l.createDate,
         convertedAt: l.convertedAt,
         daysToConvert: l.daysToConvert,

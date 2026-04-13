@@ -773,6 +773,7 @@ export default function Dashboard() {
                         <tr>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Name</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Marina</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Source</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Created</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Converted</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Days to Convert</th>
@@ -787,6 +788,15 @@ export default function Dashboard() {
                               <span className="ml-2 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">Converted</span>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">{lead.marina}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {lead.leadSource === "Call" ? (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy">📞 Call</span>
+                              ) : lead.leadSource === "Web Form" ? (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gold/10 text-gold">📋 Web Form</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">{lead.leadSource || "Digital"}</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-500">
                               {lead.createDate ? new Date(lead.createDate).toLocaleDateString() : "--"}
                             </td>
