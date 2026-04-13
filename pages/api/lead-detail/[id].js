@@ -26,6 +26,7 @@ export default async function handler(req, res) {
           sentBy: eng.sentBy,
           loggedFrom: eng.loggedFrom,
           isAutomated: eng.emailType === "AUTOMATED",
+          actorName: eng.ownerName || null,
           label:
             subtype === "EMAIL_INBOUND"
               ? "Inbound Email"
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
         notes: eng.body || "",
         recordingUrl: eng.recordingUrl,
         isLogged: eng.isLogged || false,
+        actorName: eng.ownerName || null,
         label:
           eng.direction === "INBOUND"
             ? `Inbound Call -- ${eng.disposition}`

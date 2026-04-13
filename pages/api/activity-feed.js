@@ -39,7 +39,7 @@ export default async function handler(req, res) {
           type: eng.type,
           subtype,
           disposition: eng.disposition || null,
-          repName: lead.ownerName,
+          repName: eng.ownerName || lead.ownerName,
           leadName: lead.name,
           contactId: lead.contactId,
           marina: lead.marina,

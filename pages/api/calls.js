@@ -37,7 +37,7 @@ export default async function handler(req, res) {
           }
 
           recentCalls.push({
-            repName: lead.ownerName,
+            repName: eng.ownerName || lead.ownerName,
             leadName: lead.name,
             direction: eng.direction,
             disposition: eng.disposition,

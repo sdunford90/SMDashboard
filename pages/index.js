@@ -1007,6 +1007,71 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            {/* Recent Calls Log */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-lg font-semibold text-navy">Recent Calls Log</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Most recent calls first · showing up to 60 per property</p>
+              </div>
+              {!callData?.marinaStats ? (
+                <div className="p-6"><LoadingSkeleton height="h-48" /></div>
+              ) : (() => {
+                const allCalls = Object.values(callData.marinaStats)
+                  .filter(m => callsMarinaFilter === "all" || m.marina === callsMarinaFilter)
+                  .flatMap(m => (m.recentCalls || []).map(c => ({ ...c, marina: m.marina })))
+                  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                  .slice(0, 100);
+                if (allCalls.length === 0) return <p className="px-6 py-8 text-center text-sm text-gray-400">No calls in this period.</p>;
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">When</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Rep</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Lead</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Direction</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Outcome</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Duration</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {allCalls.map((call, i) => (
+                          <tr key={i} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{new Date(call.timestamp).toLocaleDateString()} {new Date(call.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+                            <td className="px-4 py-2.5 text-xs font-medium text-indigo-700 whitespace-nowrap">{call.repName || "—"}</td>
+                            <td className="px-4 py-2.5 text-xs font-medium whitespace-nowrap">
+                              {call.hubspotUrl ? (
+                                <a href={call.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline">{call.leadName}</a>
+                              ) : call.leadName}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{call.marina}</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                call.direction === "INBOUND" ? "bg-amber-100 text-amber-800" : "bg-navy/10 text-navy"
+                              }`}>{call.direction}</span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                call.disposition === "Connected" ? "bg-green-100 text-green-800"
+                                : call.disposition === "Left Voicemail" ? "bg-blue-100 text-blue-800"
+                                : call.disposition === "No Answer" ? "bg-red-100 text-red-700"
+                                : "bg-gray-100 text-gray-600"
+                              }`}>{call.disposition || "Unknown"}</span>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{call.duration || "—"}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-400 max-w-xs truncate">{call.notes || ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
           </>)}
 
           {/* ── LEADS TAB ──────────────────────────────── */}
@@ -1564,6 +1629,9 @@ function LeadDetailPanel({ detail, loading }) {
                     {new Date(event.timestamp).toLocaleString()}
                   </span>
                 </div>
+                {event.actorName && (
+                  <p className="text-xs text-indigo-600 font-medium mt-0.5">by {event.actorName}</p>
+                )}
                 {event.subject && (
                   <p className="text-xs text-gray-600 mt-1">
                     <span className="font-medium">Subject:</span> {event.subject}
@@ -1575,7 +1643,7 @@ function LeadDetailPanel({ detail, loading }) {
                 {event.notes && (
                   <p className="text-xs text-gray-500 mt-1 italic line-clamp-3">{event.notes}</p>
                 )}
-                {event.sentBy && (
+                {event.sentBy && !event.actorName && (
                   <p className="text-xs text-gray-400 mt-1">From: {event.sentBy}</p>
                 )}
               </div>
