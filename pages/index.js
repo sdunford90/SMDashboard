@@ -124,6 +124,7 @@ export default function Dashboard() {
   const [sourceChartView, setSourceChartView] = useState("property");
   const [dateWindow, setDateWindow] = useState("7");
   const [callDays, setCallDays] = useState(30);
+  const [callsMarinaFilter, setCallsMarinaFilter] = useState("all");
   const [leadsDateWindow, setLeadsDateWindow] = useState("apr1");
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
@@ -356,6 +357,7 @@ export default function Dashboard() {
               { id: "overview", label: "Overview" },
               { id: "calls", label: "Calls by Property" },
               { id: "leads", label: "All Leads" },
+              { id: "insights", label: "Insights" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -846,7 +848,18 @@ export default function Dashboard() {
                   )}%`}
                   sub="connection rate"
                 />
-                <div className={`bg-white rounded-xl shadow-sm border p-5 flex items-center justify-end`}>
+                <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-wrap items-center justify-end gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Property:</span>
+                    <select
+                      value={callsMarinaFilter}
+                      onChange={(e) => setCallsMarinaFilter(e.target.value)}
+                      className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none"
+                    >
+                      <option value="all">All Properties</option>
+                      {(callData?.marinas || []).map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Period:</span>
                     <select
@@ -870,7 +883,7 @@ export default function Dashboard() {
                 <LoadingSkeleton height="h-72" />
               ) : (
                 <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={callData.chartData} margin={{ bottom: 60 }}>
+                  <BarChart data={callData.chartData.filter(d => callsMarinaFilter === "all" || d.marina === callsMarinaFilter)} margin={{ bottom: 60 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="marina" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" height={70} />
                     <YAxis tick={{ fontSize: 11 }} />
@@ -906,6 +919,7 @@ export default function Dashboard() {
                     </thead>
                     <tbody>
                       {callData.marinas
+                        .filter((marina) => callsMarinaFilter === "all" || marina === callsMarinaFilter)
                         .map((marina) => ({ marina, ...callData.marinaStats[marina] }))
                         .sort((a, b) => (b.totalInbound + b.totalOutbound) - (a.totalInbound + a.totalOutbound))
                         .map((row) => (
@@ -1196,6 +1210,153 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+          </>)}
+
+          {/* ── INSIGHTS TAB ────────────────────────────── */}
+          {pageTab === "insights" && (<>
+
+            {/* Property Performance Scorecard */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="text-lg font-semibold text-navy">Property Performance Scorecard</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Based on Overview period filter ({dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}) · green ≥ threshold · yellow = ok · red = needs attention</p>
+              </div>
+              {!leads?.leads || !callData?.marinaStats ? (
+                <div className="p-6"><LoadingSkeleton height="h-48" /></div>
+              ) : (() => {
+                const convMap = {};
+                for (const l of (conversionData?.leads || [])) {
+                  if (!convMap[l.marina]) convMap[l.marina] = 0;
+                  convMap[l.marina]++;
+                }
+                const rows = allMarinas
+                  .filter(m => m !== "Unknown")
+                  .map(m => {
+                    const mLeads = dateFilteredLeads.filter(l => l.marina === m);
+                    const total = mLeads.length;
+                    const responded = mLeads.filter(l => l.responded).length;
+                    const respPct = total > 0 ? Math.round((responded / total) * 100) : null;
+                    const speedLeads = mLeads.filter(l => l.speedToLeadBizMinutes !== null);
+                    const avgSpeed = speedLeads.length > 0 ? speedLeads.reduce((s,l) => s + l.speedToLeadBizMinutes, 0) / speedLeads.length : null;
+                    const calls = callData.marinaStats[m];
+                    const connRate = calls ? calls.connectedRate : null;
+                    const convTotal = (leads?.leads || []).filter(l => l.marina === m).length;
+                    const convCount = convMap[m] || 0;
+                    const convPct = convTotal > 0 ? Math.round((convCount / convTotal) * 100) : null;
+
+                    // Score each metric 0-2 (2=green,1=yellow,0=red)
+                    const scores = [];
+                    if (respPct !== null) scores.push(respPct >= 80 ? 2 : respPct >= 50 ? 1 : 0);
+                    if (avgSpeed !== null) scores.push(avgSpeed < 60 ? 2 : avgSpeed <= 240 ? 1 : 0);
+                    if (connRate !== null) scores.push(connRate >= 40 ? 2 : connRate >= 20 ? 1 : 0);
+                    if (convPct !== null) scores.push(convPct >= 20 ? 2 : convPct >= 10 ? 1 : 0);
+                    const overallScore = scores.length > 0 ? Math.round(scores.reduce((a,b)=>a+b,0) / scores.length * 50) : null;
+
+                    return { m, total, respPct, avgSpeed, connRate, convPct, overallScore };
+                  })
+                  .filter(r => r.total > 0)
+                  .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
+
+                const cell = (val, fmt, threshGreen, threshYellow, invert = false) => {
+                  if (val === null || val === undefined) return <td className="px-4 py-3 text-center text-gray-300 text-sm">--</td>;
+                  const isGreen = invert ? val <= threshGreen : val >= threshGreen;
+                  const isYellow = !isGreen && (invert ? val <= threshYellow : val >= threshYellow);
+                  const color = isGreen ? "text-emerald-600 font-semibold" : isYellow ? "text-yellow-600 font-medium" : "text-red-500 font-medium";
+                  return <td className={`px-4 py-3 text-center text-sm ${color}`}>{fmt(val)}</td>;
+                };
+
+                const badge = (score) => {
+                  if (score === null) return <span className="text-gray-300">--</span>;
+                  if (score >= 70) return <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">{score}</span>;
+                  if (score >= 40) return <span className="inline-block px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">{score}</span>;
+                  return <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-bold">{score}</span>;
+                };
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Leads</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Response Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Avg Speed to Lead</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Call Connect Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Conversion Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(r => (
+                          <tr key={r.m} className="border-b hover:bg-gray-50/50">
+                            <td className="px-4 py-3 text-sm font-medium">{r.m}</td>
+                            <td className="px-4 py-3 text-center text-sm text-gray-600">{r.total}</td>
+                            {cell(r.respPct, v => `${v}%`, 80, 50)}
+                            {cell(r.avgSpeed, v => formatSpeedToLead(v), 60, 240, true)}
+                            {cell(r.connRate, v => `${v}%`, 40, 20)}
+                            {cell(r.convPct, v => `${v}%`, 20, 10)}
+                            <td className="px-4 py-3 text-center">{badge(r.overallScore)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Word Cloud */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-navy">Call Notes Word Cloud</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Words extracted from call notes — size reflects frequency · common filler words removed</p>
+              </div>
+              {!callData?.marinaStats ? (
+                <LoadingSkeleton height="h-48" />
+              ) : (() => {
+                const STOP = new Set(["the","a","an","and","or","but","is","was","are","were","be","been","being","have","has","had","do","does","did","will","would","could","should","may","might","can","this","that","these","those","to","of","in","for","on","with","at","by","from","about","as","into","through","during","before","after","up","down","out","off","over","then","when","where","how","all","both","each","more","most","other","some","no","not","only","so","too","very","just","we","i","me","my","you","your","he","she","it","they","their","our","us","him","her","its","she","his","s","t","re","ll","ve","d","m","left","message","voicemail","called","calling","spoke","speak","talked","talk","asked","told","said","call","calls","also","back","got","let","go","going","get","give","need","new","said","well","would","wanted","wants","per","been","will","its","they","there","here","know","said","if","he","she","we","our","they","what","who","which","been","than","then","i","any","was","were","has","had"]);
+                const COLORS = ["#0c2340","#c4933f","#2563eb","#16a34a","#9333ea","#dc2626","#0891b2","#ea580c","#ca8a04","#0d9488"];
+
+                const freq = {};
+                for (const marina of Object.values(callData.marinaStats)) {
+                  for (const call of marina.recentCalls || []) {
+                    if (!call.notes) continue;
+                    const words = call.notes.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/);
+                    for (const w of words) {
+                      if (w.length < 3 || STOP.has(w)) continue;
+                      freq[w] = (freq[w] || 0) + 1;
+                    }
+                  }
+                }
+
+                const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 80);
+                if (sorted.length === 0) return <p className="text-gray-400 text-sm text-center py-8">No call notes available yet.</p>;
+
+                const maxCount = sorted[0][1];
+                const minCount = sorted[sorted.length-1][1];
+                const range = Math.max(maxCount - minCount, 1);
+
+                return (
+                  <div className="flex flex-wrap gap-2 justify-center py-4">
+                    {sorted.map(([word, count], i) => {
+                      const size = 12 + Math.round(((count - minCount) / range) * 32);
+                      const color = COLORS[i % COLORS.length];
+                      const opacity = 0.6 + ((count - minCount) / range) * 0.4;
+                      return (
+                        <span key={word}
+                          title={`${word}: ${count} occurrences`}
+                          style={{ fontSize: `${size}px`, color, opacity, lineHeight: 1.3 }}
+                          className="cursor-default select-none hover:opacity-100 transition-opacity"
+                        >
+                          {word}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
           </>)}
         </main>
       </div>

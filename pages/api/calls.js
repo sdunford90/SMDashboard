@@ -70,7 +70,7 @@ export default async function handler(req, res) {
           connectedCount > 0
             ? formatDuration(totalConnectedDuration / connectedCount)
             : "0s",
-        recentCalls: recentCalls.slice(0, 20),
+        recentCalls: recentCalls.slice(0, 60),
       };
     }
 
