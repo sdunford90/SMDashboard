@@ -126,5 +126,8 @@ function formatLead(lead) {
     ownerName: lead.ownerName,
     createDate: lead.createDate,
     hubspotUrl: lead.hubspotUrl,
+    recentFormDate: lead.recentFormDate || null,
+    recentFormName: lead.recentFormName || null,
+    numFormFills: lead.numFormFills || 0,
   };
 }

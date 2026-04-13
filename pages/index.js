@@ -433,7 +433,10 @@ export default function Dashboard() {
                     columns={["Lead", "Marina", "Missed Call Time", "Attempts", "Phone", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-red-50/30">
-                        <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
+                        <td className="px-4 py-3 font-medium text-sm">
+                          {item.name}
+                          {item.recentFormDate && (() => { const d = Math.floor((Date.now()-new Date(item.recentFormDate))/86400000); return <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-medium ${d<=7?"bg-emerald-100 text-emerald-700":"bg-blue-50 text-blue-700"}`} title={item.recentFormName||"Form submission"}>📋 {d===0?"Today":`${d}d ago`}</span>; })()}
+                        </td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.missedCallTime)}</td>
                         <td className="px-4 py-3 text-sm">{item.attempts}</td>
@@ -459,7 +462,10 @@ export default function Dashboard() {
                     columns={["Lead", "Marina", "Waiting Since", "Last Inbound", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-orange-50/30">
-                        <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
+                        <td className="px-4 py-3 font-medium text-sm">
+                          {item.name}
+                          {item.recentFormDate && (() => { const d = Math.floor((Date.now()-new Date(item.recentFormDate))/86400000); return <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-medium ${d<=7?"bg-emerald-100 text-emerald-700":"bg-blue-50 text-blue-700"}`} title={item.recentFormName||"Form submission"}>📋 {d===0?"Today":`${d}d ago`}</span>; })()}
+                        </td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.waitingSince)}</td>
                         <td className="px-4 py-3 text-sm capitalize">{item.lastInboundType?.replace(/_/g, " ").toLowerCase()}</td>
@@ -478,7 +484,10 @@ export default function Dashboard() {
                     columns={["Lead", "Marina", "Time Since Created", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-yellow-50/30">
-                        <td className="px-4 py-3 font-medium text-sm">{item.name}</td>
+                        <td className="px-4 py-3 font-medium text-sm">
+                          {item.name}
+                          {item.recentFormDate && (() => { const d = Math.floor((Date.now()-new Date(item.recentFormDate))/86400000); return <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-medium ${d<=7?"bg-emerald-100 text-emerald-700":"bg-blue-50 text-blue-700"}`} title={item.recentFormName||"Form submission"}>📋 {d===0?"Today":`${d}d ago`}</span>; })()}
+                        </td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.createDate)}</td>
                         <td className="px-4 py-3 text-sm">
@@ -519,9 +528,19 @@ export default function Dashboard() {
                             {timeAgo(item.createDate)}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500">
+                            {item.recentFormDate && (() => {
+                              const daysSince = Math.floor((Date.now() - new Date(item.recentFormDate)) / 86400000);
+                              const isNew = daysSince <= 7;
+                              return (
+                                <span className={`mr-2 inline-block px-1.5 py-0.5 rounded font-medium ${isNew ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-700"}`}
+                                  title={item.recentFormName || "Form submission"}>
+                                  📋 Form {daysSince === 0 ? "today" : `${daysSince}d ago`}
+                                </span>
+                              );
+                            })()}
                             {item.emailsSent > 0 && <span className="mr-2">{item.emailsSent} email{item.emailsSent !== 1 ? "s" : ""}</span>}
                             {item.callsOutbound > 0 && <span>{item.callsOutbound} call attempt{item.callsOutbound !== 1 ? "s" : ""}</span>}
-                            {!item.emailsSent && !item.callsOutbound && <span className="italic">No outreach yet</span>}
+                            {!item.recentFormDate && !item.emailsSent && !item.callsOutbound && <span className="italic">No outreach yet</span>}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             {item.phone ? (
@@ -548,7 +567,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-navy">Lead Count by Property</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Inbound calls · web form submissions · digital / other</p>
+              <p className="text-xs text-gray-400 mt-0.5">Inbound calls · web form submissions · digital / other · excludes imports &amp; integrations</p>
             </div>
             {!leads?.leads ? (
               <LoadingSkeleton height="h-64" />
@@ -557,11 +576,11 @@ export default function Dashboard() {
               for (const lead of leads.leads) {
                 if (lead.marina === "Unknown") continue;
                 if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
-                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0, Import: 0 };
+                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
                 sourceMap[lead.marina][lead.leadSource] = (sourceMap[lead.marina][lead.leadSource] || 0) + 1;
               }
               const chartData = Object.entries(sourceMap)
-                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) + (counts.Import||0) }))
+                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) }))
                 .sort((a, b) => b.total - a.total);
               return (
                 <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
@@ -573,8 +592,7 @@ export default function Dashboard() {
                     <Legend verticalAlign="top" />
                     <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" radius={[0,0,0,0]} />
                     <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" radius={[0,0,0,0]} />
-                    <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,0,0,0]} />
-                    <Bar dataKey="Import" name="Imported" stackId="a" fill="#d1d5db" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
+                    <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
                   </BarChart>
                 </ResponsiveContainer>
               );
