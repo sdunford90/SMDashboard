@@ -122,6 +122,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("missed");
   const [summaryMarina, setSummaryMarina] = useState("all");
   const [callDays, setCallDays] = useState(30);
+  const [conversionDays, setConversionDays] = useState("all");
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
   const [tableFilter, setTableFilter] = useState({ marina: "all" });
@@ -556,11 +557,11 @@ export default function Dashboard() {
               for (const lead of leads.leads) {
                 if (lead.marina === "Unknown") continue;
                 if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
-                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
+                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0, Import: 0 };
                 sourceMap[lead.marina][lead.leadSource] = (sourceMap[lead.marina][lead.leadSource] || 0) + 1;
               }
               const chartData = Object.entries(sourceMap)
-                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) }))
+                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) + (counts.Import||0) }))
                 .sort((a, b) => b.total - a.total);
               return (
                 <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
@@ -572,7 +573,8 @@ export default function Dashboard() {
                     <Legend verticalAlign="top" />
                     <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" radius={[0,0,0,0]} />
                     <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" radius={[0,0,0,0]} />
-                    <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
+                    <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,0,0,0]} />
+                    <Bar dataKey="Import" name="Imported" stackId="a" fill="#d1d5db" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
                   </BarChart>
                 </ResponsiveContainer>
               );
@@ -581,19 +583,43 @@ export default function Dashboard() {
 
           {/* Conversions Panel */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div className="px-6 py-4 border-b flex items-center gap-3">
+            <div className="px-6 py-4 border-b flex items-center gap-3 flex-wrap">
               <h2 className="text-lg font-semibold text-navy mr-auto">Conversions</h2>
-              <span className="text-xs text-gray-400">Time from lead to customer</span>
+              <div className="flex gap-1">
+                {[["7","7d"],["30","30d"],["90","90d"],["all","All"]].map(([v,label]) => (
+                  <button key={v} onClick={() => setConversionDays(v)}
+                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${conversionDays === v ? "bg-navy text-white border-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             {!conversionData ? (
               <div className="p-6"><LoadingSkeleton height="h-32" /></div>
             ) : (() => {
-              const convLeads = summaryMarina === "all"
+              const cutoff = conversionDays === "all" ? null : new Date(Date.now() - Number(conversionDays) * 86400000);
+              const allConvLeads = summaryMarina === "all"
                 ? (conversionData.leads || [])
                 : (conversionData.leads || []).filter((l) => l.marina === summaryMarina);
+              const convLeads = cutoff
+                ? allConvLeads.filter((l) => l.convertedAt && new Date(l.convertedAt) >= cutoff)
+                : allConvLeads;
               const withDays = convLeads.filter((l) => l.daysToConvert !== null);
               const convAvgDays = withDays.length > 0 ? Math.round(withDays.reduce((s, l) => s + l.daysToConvert, 0) / withDays.length) : null;
               const convFastest = withDays.length > 0 ? Math.min(...withDays.map((l) => l.daysToConvert)) : null;
+
+              // Build monthly trend data
+              const monthMap = {};
+              for (const l of allConvLeads) {
+                if (!l.convertedAt) continue;
+                const d = new Date(l.convertedAt);
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+                const label = d.toLocaleString("en-US",{month:"short",year:"2-digit"});
+                if (!monthMap[key]) monthMap[key] = { key, label, count: 0 };
+                monthMap[key].count++;
+              }
+              const trendData = Object.values(monthMap).sort((a,b)=>a.key.localeCompare(b.key));
+
               return (
               <div>
                 {/* KPI cards */}
@@ -615,6 +641,21 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
+                {/* Conversions over time trend */}
+                {trendData.length > 0 && (
+                  <div className="px-6 pt-4 pb-2 border-b">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Conversions Over Time</p>
+                    <ResponsiveContainer width="100%" height={140}>
+                      <BarChart data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={24} />
+                        <Tooltip formatter={(v) => [v, "Conversions"]} />
+                        <Bar dataKey="count" name="Conversions" fill="#16a34a" radius={[3,3,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 {/* Converted leads table */}
                 {convLeads.length > 0 ? (
                   <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
