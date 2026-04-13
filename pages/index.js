@@ -121,6 +121,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("missed");
   const [summaryMarina, setSummaryMarina] = useState("all");
+  const [sourceChartView, setSourceChartView] = useState("property");
   const [callDays, setCallDays] = useState(30);
   const [conversionDays, setConversionDays] = useState("all");
   const [marinaFilter, setMarinaFilter] = useState("all");
@@ -563,15 +564,25 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Lead Sources by Property */}
+          {/* Lead Sources */}
           <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-navy">Lead Count by Property</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Inbound calls · web form submissions · digital / other · excludes imports &amp; integrations</p>
+            <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-lg font-semibold text-navy">Lead Sources</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Excludes imports &amp; automation. Form fills always counted as Web Form.</p>
+              </div>
+              <div className="flex gap-1">
+                {[["property","By Property"],["source","By Source"]].map(([v,label]) => (
+                  <button key={v} onClick={() => setSourceChartView(v)}
+                    className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${sourceChartView === v ? "bg-navy text-white border-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             {!leads?.leads ? (
               <LoadingSkeleton height="h-64" />
-            ) : (() => {
+            ) : sourceChartView === "property" ? (() => {
               const sourceMap = {};
               for (const lead of leads.leads) {
                 if (lead.marina === "Unknown") continue;
@@ -595,6 +606,50 @@ export default function Dashboard() {
                     <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
                   </BarChart>
                 </ResponsiveContainer>
+              );
+            })() : (() => {
+              // By Source — group by hsSource across the marina filter
+              const COLORS = {
+                "Call": "#0c2340",
+                "Web Form": "#c4933f",
+                "Paid Search (Form)": "#f59e0b",
+                "Organic Search (Form)": "#10b981",
+                "Social (Form)": "#8b5cf6",
+                "Direct (Form)": "#06b6d4",
+                "Referral (Form)": "#14b8a6",
+                "Paid Search": "#fbbf24",
+                "Organic Search": "#34d399",
+                "Social Media": "#a78bfa",
+                "Direct Traffic": "#67e8f9",
+                "Referral": "#2dd4bf",
+                "Email": "#f472b6",
+              };
+              const counts = {};
+              for (const lead of leads.leads) {
+                if (lead.marina === "Unknown") continue;
+                if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
+                const src = lead.hsSource || "Unknown";
+                counts[src] = (counts[src] || 0) + 1;
+              }
+              const total = Object.values(counts).reduce((s, v) => s + v, 0);
+              const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+              return (
+                <div className="space-y-2 mt-2">
+                  {rows.map(([src, cnt]) => {
+                    const pct = total ? Math.round((cnt / total) * 100) : 0;
+                    const color = COLORS[src] || "#94a3b8";
+                    return (
+                      <div key={src} className="flex items-center gap-3">
+                        <div className="w-36 text-xs text-gray-600 text-right shrink-0">{src}</div>
+                        <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                          <div className="h-4 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color, minWidth: cnt > 0 ? "2px" : 0 }} />
+                        </div>
+                        <div className="w-16 text-xs text-gray-700 font-medium">{cnt} <span className="text-gray-400">({pct}%)</span></div>
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-gray-400 pt-2">Total: {total} leads</p>
+                </div>
               );
             })()}
           </div>
