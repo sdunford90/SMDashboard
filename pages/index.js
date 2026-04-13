@@ -122,6 +122,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("missed");
   const [summaryMarina, setSummaryMarina] = useState("all");
   const [sourceChartView, setSourceChartView] = useState("property");
+  const [dateWindow, setDateWindow] = useState("7");
   const [callDays, setCallDays] = useState(30);
   const [conversionDays, setConversionDays] = useState("all");
   const [marinaFilter, setMarinaFilter] = useState("all");
@@ -197,11 +198,20 @@ export default function Dashboard() {
     }
   };
 
-  // Summary calculations — filtered by summaryMarina
-  const summaryLeads =
-    summaryMarina === "all"
-      ? (leads?.leads || [])
-      : (leads?.leads || []).filter((l) => l.marina === summaryMarina);
+  // Global date window
+  const windowStart = dateWindow === "all"
+    ? new Date("2026-01-01T00:00:00.000Z")
+    : new Date(Date.now() - parseInt(dateWindow, 10) * 24 * 60 * 60 * 1000);
+
+  // Date-filtered base (all marinas)
+  const dateFilteredLeads = (leads?.leads || []).filter(
+    (l) => l.createDate && new Date(l.createDate) >= windowStart
+  );
+
+  // Summary calculations — filtered by summaryMarina + date window
+  const summaryLeads = dateFilteredLeads.filter(
+    (l) => summaryMarina === "all" || l.marina === summaryMarina
+  );
   const totalLeads = summaryLeads.length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
@@ -210,18 +220,19 @@ export default function Dashboard() {
     avgSpeedLeads.length > 0
       ? avgSpeedLeads.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / avgSpeedLeads.length
       : null;
-  const waitingCount =
-    summaryMarina === "all"
-      ? (actionQueue?.counts?.missedCalls || 0) + (actionQueue?.counts?.waitingOnReply || 0)
-      : summaryLeads.filter((l) => l.hasMissedInbound || l.waitingOnReply).length;
 
-  // Marina-filtered action queue (respects the Overview property filter)
-  const filterByMarina = (arr) =>
-    summaryMarina === "all" ? (arr || []) : (arr || []).filter((i) => i.marina === summaryMarina);
-  const filteredMissedCalls = filterByMarina(actionQueue?.missedCalls);
-  const filteredWaitingOnReply = filterByMarina(actionQueue?.waitingOnReply);
-  const filteredNeverResponded = filterByMarina(actionQueue?.neverResponded);
-  const filteredAllUnresponded = filterByMarina(actionQueue?.allUnresponded);
+  // Action queue items — filter by date window + marina
+  const filterByDateAndMarina = (arr) =>
+    (arr || []).filter((i) => {
+      if (summaryMarina !== "all" && i.marina !== summaryMarina) return false;
+      if (i.createDate && new Date(i.createDate) < windowStart) return false;
+      return true;
+    });
+  const filteredMissedCalls = filterByDateAndMarina(actionQueue?.missedCalls);
+  const filteredWaitingOnReply = filterByDateAndMarina(actionQueue?.waitingOnReply);
+  const filteredNeverResponded = filterByDateAndMarina(actionQueue?.neverResponded);
+  const filteredAllUnresponded = filterByDateAndMarina(actionQueue?.allUnresponded);
+  const waitingCount = filteredMissedCalls.length + filteredWaitingOnReply.length;
 
   // Per-marina conversion rate (for calls breakdown table)
   const marinaConversionMap = {};
@@ -235,8 +246,8 @@ export default function Dashboard() {
   const allMarinas = leads?.leads
     ? [...new Set(leads.leads.map((l) => l.marina))].sort()
     : [];
-  // Sorted / filtered leads table
-  const filteredLeads = (leads?.leads || []).filter((l) => {
+  // Sorted / filtered leads table (respects date window)
+  const filteredLeads = dateFilteredLeads.filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
     return true;
   });
@@ -366,21 +377,41 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Filter by property:</span>
-                <select
-                  value={summaryMarina}
-                  onChange={(e) => setSummaryMarina(e.target.value)}
-                  className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none bg-white"
-                >
-                  <option value="all">All Properties</option>
-                  {allMarinas.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Property:</span>
+                  <select
+                    value={summaryMarina}
+                    onChange={(e) => setSummaryMarina(e.target.value)}
+                    className="text-sm border rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-gold focus:outline-none bg-white"
+                  >
+                    <option value="all">All Properties</option>
+                    {allMarinas.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Period:</span>
+                  <div className="flex gap-1">
+                    {[["7","Last 7d"],["30","Last 30d"],["90","Last 90d"],["all","All 2026"]].map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => setDateWindow(v)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          dateWindow === v
+                            ? "bg-navy text-white border-navy"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label={summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`} value={totalLeads} />
+                <StatCard label={summaryMarina === "all" ? "Total Leads" : `${summaryMarina} — Leads`} value={totalLeads} sub={dateWindow === "all" ? "Since Jan 1" : `Last ${dateWindow} days`} />
                 <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
                 <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} sub="business hours" />
                 <StatCard
@@ -584,7 +615,7 @@ export default function Dashboard() {
               <LoadingSkeleton height="h-64" />
             ) : sourceChartView === "property" ? (() => {
               const sourceMap = {};
-              for (const lead of leads.leads) {
+              for (const lead of dateFilteredLeads) {
                 if (lead.marina === "Unknown") continue;
                 if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
                 if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
@@ -608,7 +639,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               );
             })() : (() => {
-              // By Source — group by hsSource across the marina filter
+              // By Source — group by hsSource across the marina filter (date-filtered)
               const COLORS = {
                 "Call": "#0c2340",
                 "Web Form": "#c4933f",
@@ -625,7 +656,7 @@ export default function Dashboard() {
                 "Email": "#f472b6",
               };
               const counts = {};
-              for (const lead of leads.leads) {
+              for (const lead of dateFilteredLeads) {
                 if (lead.marina === "Unknown") continue;
                 if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
                 const src = lead.hsSource || "Unknown";
