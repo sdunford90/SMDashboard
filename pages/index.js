@@ -215,8 +215,9 @@ export default function Dashboard() {
   );
   const totalLeads = summaryLeads.length;
   const sourceCallCount    = summaryLeads.filter((l) => l.leadSource === "Call").length;
+  const sourceWalkInCount  = summaryLeads.filter((l) => l.leadSource === "Walk-in").length;
   const sourceFormCount    = summaryLeads.filter((l) => l.leadSource === "Web Form").length;
-  const sourceDigitalCount = summaryLeads.filter((l) => l.leadSource !== "Call" && l.leadSource !== "Web Form").length;
+  const sourceDigitalCount = summaryLeads.filter((l) => !["Call","Walk-in","Web Form"].includes(l.leadSource)).length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
   const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadBizMinutes !== null);
@@ -435,6 +436,11 @@ export default function Dashboard() {
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy">
                       📞 {sourceCallCount}
                     </span>
+                    {sourceWalkInCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700">
+                        🚶 {sourceWalkInCount}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gold/10 text-yellow-700">
                       📋 {sourceFormCount}
                     </span>
@@ -631,7 +637,7 @@ export default function Dashboard() {
             <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <h2 className="text-lg font-semibold text-navy">Lead Sources</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Excludes imports &amp; automation. Form fills always counted as Web Form.</p>
+                <p className="text-xs text-gray-400 mt-0.5">CRM-entered contacts (calls, walk-ins) included. Excludes Power Automate &amp; bulk imports.</p>
               </div>
               <div className="flex gap-1">
                 {[["property","By Property"],["source","By Source"]].map(([v,label]) => (
@@ -649,11 +655,18 @@ export default function Dashboard() {
               for (const lead of dateFilteredLeads) {
                 if (lead.marina === "Unknown") continue;
                 if (summaryMarina !== "all" && lead.marina !== summaryMarina) continue;
-                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
-                sourceMap[lead.marina][lead.leadSource] = (sourceMap[lead.marina][lead.leadSource] || 0) + 1;
+                if (!sourceMap[lead.marina]) sourceMap[lead.marina] = { Call: 0, "Walk-in": 0, "Web Form": 0, Digital: 0 };
+                const bucket = lead.leadSource === "Call" ? "Call"
+                  : lead.leadSource === "Walk-in" ? "Walk-in"
+                  : lead.leadSource === "Web Form" ? "Web Form"
+                  : "Digital";
+                sourceMap[lead.marina][bucket]++;
               }
               const chartData = Object.entries(sourceMap)
-                .map(([marina, counts]) => ({ marina, ...counts, total: (counts.Call||0) + (counts["Web Form"]||0) + (counts.Digital||0) }))
+                .map(([marina, counts]) => ({
+                  marina, ...counts,
+                  total: (counts.Call||0) + (counts["Walk-in"]||0) + (counts["Web Form"]||0) + (counts.Digital||0)
+                }))
                 .sort((a, b) => b.total - a.total);
               return (
                 <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
@@ -664,6 +677,7 @@ export default function Dashboard() {
                     <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} />
                     <Legend verticalAlign="top" />
                     <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" radius={[0,0,0,0]} />
+                    <Bar dataKey="Walk-in" name="Walk-in" stackId="a" fill="#0f766e" radius={[0,0,0,0]} />
                     <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" radius={[0,0,0,0]} />
                     <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0,4,4,0]} label={{ position: "right", fontSize: 11, formatter: (v, entry) => entry?.payload?.total }} />
                   </BarChart>
@@ -673,6 +687,10 @@ export default function Dashboard() {
               // By Source — group by hsSource across the marina filter (date-filtered)
               const COLORS = {
                 "Call": "#0c2340",
+                "Phone Call": "#0c2340",
+                "Walk-in": "#0f766e",
+                "Walk-In": "#0f766e",
+                "Referral": "#2dd4bf",
                 "Web Form": "#c4933f",
                 "Paid Search (Form)": "#f59e0b",
                 "Organic Search (Form)": "#10b981",
@@ -683,7 +701,6 @@ export default function Dashboard() {
                 "Organic Search": "#34d399",
                 "Social Media": "#a78bfa",
                 "Direct Traffic": "#67e8f9",
-                "Referral": "#2dd4bf",
                 "Email": "#f472b6",
               };
               const counts = {};

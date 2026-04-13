@@ -293,10 +293,14 @@ export default function Presentation() {
                   </h2>
 
                   {/* Summary KPI row */}
-                  <div className="grid grid-cols-3 gap-5">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
-                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">📞 Calls / Walk-ins</div>
-                      <div className="text-5xl font-bold text-[#0c2340] bg-white/90 rounded-lg py-2">{data.sourceCount?.Call ?? 0}</div>
+                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">📞 Phone Calls</div>
+                      <div className="text-5xl font-bold text-white bg-white/10 rounded-lg py-2">{data.sourceCount?.Call ?? 0}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
+                      <div className="text-white/50 text-xs uppercase tracking-widest mb-2">🚶 Walk-ins</div>
+                      <div className="text-5xl font-bold text-teal-300 bg-white/10 rounded-lg py-2">{data.sourceCount?.["Walk-in"] ?? 0}</div>
                     </div>
                     <div className="bg-white/5 border border-white/10 rounded-xl px-6 py-5 text-center">
                       <div className="text-white/50 text-xs uppercase tracking-widest mb-2">📋 Web Forms</div>
@@ -327,7 +331,8 @@ export default function Presentation() {
                               labelStyle={{ color: "#fff" }}
                             />
                             <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12, paddingTop: 8 }} />
-                            <Bar dataKey="Call" name="Call / Walk-in" stackId="a" fill="#0c2340" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                            <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                            <Bar dataKey="Walk-in" name="Walk-in" stackId="a" fill="#0f766e" />
                             <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" />
                             <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0, 4, 4, 0]}
                               label={{ position: "right", fill: "rgba(255,255,255,0.5)", fontSize: 11, formatter: (v, e) => e?.payload?.total }} />
@@ -347,6 +352,7 @@ export default function Presentation() {
                             <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
                               <th className="px-5 py-2 text-left">Property</th>
                               <th className="px-5 py-2 text-right text-white/70">📞 Call</th>
+                              <th className="px-5 py-2 text-right text-teal-300">🚶 Walk-in</th>
                               <th className="px-5 py-2 text-right text-[#c4933f]">📋 Form</th>
                               <th className="px-5 py-2 text-right text-blue-400">🌐 Digital</th>
                               <th className="px-5 py-2 text-right">Total</th>
@@ -357,6 +363,7 @@ export default function Presentation() {
                               <tr key={row.marina} className="border-b border-white/5 hover:bg-white/5">
                                 <td className="px-5 py-2.5 font-medium">{row.marina}</td>
                                 <td className="px-5 py-2.5 text-right font-semibold text-white/80">{row.Call}</td>
+                                <td className="px-5 py-2.5 text-right font-semibold text-teal-300">{row["Walk-in"] ?? 0}</td>
                                 <td className="px-5 py-2.5 text-right font-semibold text-[#c4933f]">{row["Web Form"]}</td>
                                 <td className="px-5 py-2.5 text-right font-semibold text-blue-400">{row.Digital}</td>
                                 <td className="px-5 py-2.5 text-right text-white/50">{row.total}</td>
@@ -365,10 +372,11 @@ export default function Presentation() {
                             <tr className="border-t border-white/20 font-bold">
                               <td className="px-5 py-3 text-white/60 text-xs uppercase tracking-wide">Total</td>
                               <td className="px-5 py-3 text-right text-white/80">{data.sourceCount?.Call ?? 0}</td>
+                              <td className="px-5 py-3 text-right text-teal-300">{data.sourceCount?.["Walk-in"] ?? 0}</td>
                               <td className="px-5 py-3 text-right text-[#c4933f]">{data.sourceCount?.["Web Form"] ?? 0}</td>
                               <td className="px-5 py-3 text-right text-blue-400">{data.sourceCount?.Digital ?? 0}</td>
                               <td className="px-5 py-3 text-right text-white">
-                                {(data.sourceCount?.Call ?? 0) + (data.sourceCount?.["Web Form"] ?? 0) + (data.sourceCount?.Digital ?? 0)}
+                                {(data.sourceCount?.Call ?? 0) + (data.sourceCount?.["Walk-in"] ?? 0) + (data.sourceCount?.["Web Form"] ?? 0) + (data.sourceCount?.Digital ?? 0)}
                               </td>
                             </tr>
                           </tbody>
@@ -529,6 +537,9 @@ function SourcePills({ src }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-3">
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-white/80">📞 {src.Call ?? 0}</span>
+      {(src.WalkIn ?? 0) > 0 && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-500/20 text-teal-300">🚶 {src.WalkIn}</span>
+      )}
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#c4933f]/20 text-[#c4933f]">📋 {src.WebForm ?? 0}</span>
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300">🌐 {src.Digital ?? 0}</span>
     </div>

@@ -19,9 +19,10 @@ export default async function handler(req, res) {
 
     function srcCounts(arr) {
       return {
-        Call:     arr.filter((l) => l.leadSource === "Call").length,
-        WebForm:  arr.filter((l) => l.leadSource === "Web Form").length,
-        Digital:  arr.filter((l) => l.leadSource !== "Call" && l.leadSource !== "Web Form").length,
+        Call:    arr.filter((l) => l.leadSource === "Call").length,
+        WalkIn:  arr.filter((l) => l.leadSource === "Walk-in").length,
+        WebForm: arr.filter((l) => l.leadSource === "Web Form").length,
+        Digital: arr.filter((l) => !["Call","Walk-in","Web Form"].includes(l.leadSource)).length,
       };
     }
     const srcAll     = srcCounts(leads);
@@ -86,21 +87,23 @@ export default async function handler(req, res) {
       .sort((a, b) => b.total - a.total);
 
     // Lead source breakdown (all-time, all marinas)
-    const sourceCount = { Call: 0, "Web Form": 0, Digital: 0 };
+    const sourceCount = { Call: 0, "Walk-in": 0, "Web Form": 0, Digital: 0 };
     const sourceByMarina = {};
     for (const lead of leads) {
-      const src = lead.leadSource || "Digital";
-      sourceCount[src] = (sourceCount[src] || 0) + 1;
-      if (!sourceByMarina[lead.marina]) sourceByMarina[lead.marina] = { Call: 0, "Web Form": 0, Digital: 0 };
-      sourceByMarina[lead.marina][src] = (sourceByMarina[lead.marina][src] || 0) + 1;
+      const raw = lead.leadSource || "Digital";
+      const bucket = raw === "Call" ? "Call" : raw === "Walk-in" ? "Walk-in" : raw === "Web Form" ? "Web Form" : "Digital";
+      sourceCount[bucket] = (sourceCount[bucket] || 0) + 1;
+      if (!sourceByMarina[lead.marina]) sourceByMarina[lead.marina] = { Call: 0, "Walk-in": 0, "Web Form": 0, Digital: 0 };
+      sourceByMarina[lead.marina][bucket] = (sourceByMarina[lead.marina][bucket] || 0) + 1;
     }
     const leadSourceByMarina = Object.entries(sourceByMarina)
       .map(([marina, counts]) => ({
         marina,
         Call: counts.Call || 0,
+        "Walk-in": counts["Walk-in"] || 0,
         "Web Form": counts["Web Form"] || 0,
         Digital: counts.Digital || 0,
-        total: (counts.Call || 0) + (counts["Web Form"] || 0) + (counts.Digital || 0),
+        total: (counts.Call || 0) + (counts["Walk-in"] || 0) + (counts["Web Form"] || 0) + (counts.Digital || 0),
       }))
       .filter((m) => m.total > 0)
       .sort((a, b) => b.total - a.total);
