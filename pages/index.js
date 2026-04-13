@@ -124,7 +124,7 @@ export default function Dashboard() {
   const [sourceChartView, setSourceChartView] = useState("property");
   const [dateWindow, setDateWindow] = useState("7");
   const [callDays, setCallDays] = useState(30);
-  const [conversionDays, setConversionDays] = useState("all");
+  const [leadsDateWindow, setLeadsDateWindow] = useState("apr1");
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
   const [tableFilter, setTableFilter] = useState({ marina: "all" });
@@ -246,9 +246,17 @@ export default function Dashboard() {
   const allMarinas = leads?.leads
     ? [...new Set(leads.leads.map((l) => l.marina))].sort()
     : [];
-  // Sorted / filtered leads table (respects date window)
-  const filteredLeads = dateFilteredLeads.filter((l) => {
+  // All Leads tab — its own independent date window
+  const leadsWindowStart = leadsDateWindow === "all"
+    ? new Date("2026-01-01T00:00:00.000Z")
+    : leadsDateWindow === "apr1"
+    ? new Date("2026-04-01T00:00:00.000Z")
+    : new Date(Date.now() - parseInt(leadsDateWindow, 10) * 24 * 60 * 60 * 1000);
+
+  // Sorted / filtered leads table (respects its own date window)
+  const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
+    if (l.createDate && new Date(l.createDate) < leadsWindowStart) return false;
     return true;
   });
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -689,32 +697,27 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
             <div className="px-6 py-4 border-b flex items-center gap-3 flex-wrap">
               <h2 className="text-lg font-semibold text-navy mr-auto">Conversions</h2>
-              <div className="flex gap-1">
-                {[["7","7d"],["30","30d"],["90","90d"],["all","All"]].map(([v,label]) => (
-                  <button key={v} onClick={() => setConversionDays(v)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${conversionDays === v ? "bg-navy text-white border-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <span className="text-xs text-gray-400">
+                {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}
+                {summaryMarina !== "all" ? ` · ${summaryMarina}` : ""}
+              </span>
             </div>
             {!conversionData ? (
               <div className="p-6"><LoadingSkeleton height="h-32" /></div>
             ) : (() => {
-              const cutoff = conversionDays === "all" ? null : new Date(Date.now() - Number(conversionDays) * 86400000);
               const allConvLeads = summaryMarina === "all"
                 ? (conversionData.leads || [])
                 : (conversionData.leads || []).filter((l) => l.marina === summaryMarina);
-              const convLeads = cutoff
-                ? allConvLeads.filter((l) => l.convertedAt && new Date(l.convertedAt) >= cutoff)
-                : allConvLeads;
+              const convLeads = dateWindow === "all"
+                ? allConvLeads
+                : allConvLeads.filter((l) => l.convertedAt && new Date(l.convertedAt) >= windowStart);
               const withDays = convLeads.filter((l) => l.daysToConvert !== null);
               const convAvgDays = withDays.length > 0 ? Math.round(withDays.reduce((s, l) => s + l.daysToConvert, 0) / withDays.length) : null;
               const convFastest = withDays.length > 0 ? Math.min(...withDays.map((l) => l.daysToConvert)) : null;
 
-              // Build monthly trend data
+              // Build monthly trend data (filtered to same window)
               const monthMap = {};
-              for (const l of allConvLeads) {
+              for (const l of convLeads) {
                 if (!l.convertedAt) continue;
                 const d = new Date(l.convertedAt);
                 const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
@@ -1009,6 +1012,14 @@ export default function Dashboard() {
               <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div className="px-6 py-4 border-b flex flex-wrap items-center gap-3">
                   <h2 className="text-lg font-semibold text-navy mr-auto">All Leads</h2>
+                  <div className="flex gap-1">
+                    {[["7","Last 7d"],["30","Last 30d"],["90","Last 90d"],["apr1","Since Apr 1"],["all","All 2026"]].map(([v,label]) => (
+                      <button key={v} onClick={() => setLeadsDateWindow(v)}
+                        className={`px-2.5 py-1.5 rounded text-xs font-medium border transition-colors ${leadsDateWindow === v ? "bg-navy text-white border-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <select
                     value={tableFilter.marina}
                     onChange={(e) => setTableFilter((f) => ({ ...f, marina: e.target.value }))}
@@ -1019,6 +1030,7 @@ export default function Dashboard() {
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
+                  <span className="text-xs text-gray-400">{filteredLeads.length} leads</span>
                 </div>
                 {!leads?.leads ? (
                   <div className="p-6"><LoadingSkeleton height="h-64" /></div>
