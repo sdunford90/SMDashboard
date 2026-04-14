@@ -37,6 +37,16 @@ export default async function handler(req, res) {
               : "Sent Email",
         };
       }
+      if (eng.type === "NOTE") {
+        return {
+          type: "NOTE",
+          subtype: "NOTE",
+          timestamp: eng.timestamp,
+          notes: eng.body || "",
+          actorName: eng.ownerName || null,
+          label: "Note",
+        };
+      }
       return {
         type: "CALL",
         subtype: eng.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL",

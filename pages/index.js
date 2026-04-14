@@ -1619,7 +1619,8 @@ function LeadDetailPanel({ detail, loading }) {
           {detail.timeline?.map((event, i) => (
             <div key={i} className="relative pl-6 pb-4">
               <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
-                event.type === "CALL"
+                event.type === "NOTE" ? "bg-yellow-400"
+                  : event.type === "CALL"
                   ? event.isLogged ? "bg-purple-500"
                   : event.direction === "INBOUND" ? "bg-orange-400"
                   : "bg-navy"
@@ -1631,7 +1632,9 @@ function LeadDetailPanel({ detail, loading }) {
               <div className="bg-white rounded border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {event.type === "CALL" ? (
+                    {event.type === "NOTE" ? (
+                      <svg className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+                    ) : event.type === "CALL" ? (
                       <svg className="w-3.5 h-3.5 text-navy" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
                     ) : (
                       <svg className="w-3.5 h-3.5 text-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
