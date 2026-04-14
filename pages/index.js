@@ -117,6 +117,7 @@ export default function Dashboard() {
   const [callData, setCallData] = useState(null);
   const [activityFeed, setActivityFeed] = useState(null);
   const [conversionData, setConversionData] = useState(null);
+  const [trendsData, setTrendsData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [cacheStatus, setCacheStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,8 +154,9 @@ export default function Dashboard() {
       fetch(`/api/calls?days=${callDays}`).then((r) => r.json()),
       fetch("/api/activity-feed").then((r) => r.json()),
       fetch("/api/conversions").then((r) => r.json()),
+      fetch("/api/trends").then((r) => r.json()),
     ];
-    const [leadsRes, speedRes, queueRes, callsRes, feedRes, convRes] =
+    const [leadsRes, speedRes, queueRes, callsRes, feedRes, convRes, trendsRes] =
       await Promise.allSettled(endpoints);
 
     if (leadsRes.status === "fulfilled") setLeads(leadsRes.value);
@@ -163,6 +165,7 @@ export default function Dashboard() {
     if (callsRes.status === "fulfilled") setCallData(callsRes.value);
     if (feedRes.status === "fulfilled") setActivityFeed(feedRes.value);
     if (convRes.status === "fulfilled") setConversionData(convRes.value);
+    if (trendsRes.status === "fulfilled") setTrendsData(trendsRes.value);
     setLastUpdated(new Date());
   }, [callDays]);
 
@@ -399,6 +402,7 @@ export default function Dashboard() {
               { id: "calls", label: "Calls by Property" },
               { id: "leads", label: "All Leads" },
               { id: "insights", label: "Insights" },
+              { id: "trends", label: "Trends" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1519,6 +1523,113 @@ export default function Dashboard() {
                       );
                     })}
                   </div>
+                );
+              })()}
+            </div>
+
+          </>)}
+
+          {/* ── TRENDS TAB ──────────────────────────────── */}
+          {pageTab === "trends" && (<>
+
+            {/* Speed to Lead Over Time */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-navy">Speed to Lead Over Time</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Average business-minute response time per calendar month · April 2026 onward</p>
+              </div>
+              {!trendsData?.months ? (
+                <LoadingSkeleton height="h-72" />
+              ) : trendsData.months.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
+              ) : (() => {
+                const chartData = trendsData.months.map((m) => {
+                  const row = { month: m.label };
+                  if (m.overall.avgSpeedBizMinutes !== null) row["Overall"] = m.overall.avgSpeedBizMinutes;
+                  for (const marina of trendsData.marinas) {
+                    const v = m.byMarina[marina]?.avgSpeedBizMinutes;
+                    if (v !== null && v !== undefined) row[marina] = v;
+                  }
+                  return row;
+                });
+                const keys = ["Overall", ...trendsData.marinas];
+                const colors = ["#64748b", ...MARINA_COLORS];
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatSpeedToLead(v)} width={64} />
+                        <Tooltip formatter={(value, name) => [formatSpeedToLead(value), name]} />
+                        <Legend />
+                        {keys.map((key, i) => (
+                          <Line
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            stroke={colors[i % colors.length]}
+                            strokeWidth={key === "Overall" ? 2.5 : 1.5}
+                            strokeDasharray={key === "Overall" ? "6 3" : undefined}
+                            dot={{ r: 3 }}
+                            connectNulls={false}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <p className="text-xs text-gray-400 mt-2">Lower is better · gaps indicate no data for that marina/month</p>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Conversion Rate Over Time */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-navy">Conversion Rate Over Time</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Percentage of leads that converted per calendar month · April 2026 onward</p>
+              </div>
+              {!trendsData?.months ? (
+                <LoadingSkeleton height="h-72" />
+              ) : trendsData.months.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
+              ) : (() => {
+                const chartData = trendsData.months.map((m) => {
+                  const row = { month: m.label };
+                  if (m.overall.conversionRate !== null) row["Overall"] = m.overall.conversionRate;
+                  for (const marina of trendsData.marinas) {
+                    const v = m.byMarina[marina]?.conversionRate;
+                    if (v !== null && v !== undefined) row[marina] = v;
+                  }
+                  return row;
+                });
+                const keys = ["Overall", ...trendsData.marinas];
+                const colors = ["#64748b", ...MARINA_COLORS];
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={48} domain={[0, "auto"]} />
+                        <Tooltip formatter={(value, name) => [`${value}%`, name]} />
+                        <Legend />
+                        {keys.map((key, i) => (
+                          <Line
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            stroke={colors[i % colors.length]}
+                            strokeWidth={key === "Overall" ? 2.5 : 1.5}
+                            strokeDasharray={key === "Overall" ? "6 3" : undefined}
+                            dot={{ r: 3 }}
+                            connectNulls={false}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <p className="text-xs text-gray-400 mt-2">Higher is better · gaps indicate no data for that marina/month</p>
+                  </>
                 );
               })()}
             </div>
