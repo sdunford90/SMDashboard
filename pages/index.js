@@ -118,6 +118,7 @@ export default function Dashboard() {
   const [activityFeed, setActivityFeed] = useState(null);
   const [conversionData, setConversionData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [cacheStatus, setCacheStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("missed");
   const [summaryMarina, setSummaryMarina] = useState("all");
@@ -133,6 +134,16 @@ export default function Dashboard() {
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [pageTab, setPageTab] = useState("overview");
+
+  const fetchCacheStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cache-status");
+      if (res.ok) {
+        const data = await res.json();
+        setCacheStatus(data);
+      }
+    } catch {}
+  }, []);
 
   const fetchAll = useCallback(async () => {
     const endpoints = [
@@ -157,7 +168,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+    fetchCacheStatus();
+  }, [fetchAll, fetchCacheStatus]);
+
+  // Poll cache status every 60s so "Last updated" stays current
+  useEffect(() => {
+    const interval = setInterval(fetchCacheStatus, 60000);
+    return () => clearInterval(interval);
+  }, [fetchCacheStatus]);
 
   // Auto-refresh activity feed every 60s
   useEffect(() => {
@@ -174,9 +192,26 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetch("/api/cache/clear", { method: "POST" });
-      await fetchAll();
-    } catch {} finally {
+      await fetch("/api/refresh", { method: "POST" });
+      // Poll until the background refresh completes, then re-fetch dashboard data
+      const poll = async () => {
+        try {
+          const res = await fetch("/api/cache-status");
+          if (res.ok) {
+            const status = await res.json();
+            setCacheStatus(status);
+            if (status.isRefreshing) {
+              setTimeout(poll, 2000);
+              return;
+            }
+          }
+        } catch {}
+        await fetchAll();
+        await fetchCacheStatus();
+        setRefreshing(false);
+      };
+      setTimeout(poll, 2000);
+    } catch {
       setRefreshing(false);
     }
   };
@@ -315,9 +350,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {lastUpdated && (
+            {cacheStatus?.cachedAt && (
               <span className="text-gray-400 text-xs hidden sm:block">
-                Last updated: {timeAgo(lastUpdated)}
+                {cacheStatus.isRefreshing
+                  ? "Refreshing data..."
+                  : `Data from ${timeAgo(cacheStatus.cachedAt)}`}
               </span>
             )}
             <Link
