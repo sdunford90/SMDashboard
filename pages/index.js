@@ -1030,6 +1030,7 @@ export default function Dashboard() {
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">When</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Rep</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Lead</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Closed</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Direction</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Outcome</th>
@@ -1046,6 +1047,11 @@ export default function Dashboard() {
                               {call.hubspotUrl ? (
                                 <a href={call.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline">{call.leadName}</a>
                               ) : call.leadName}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                              {call.isClosed
+                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">✓ Closed</span>
+                                : <span className="text-gray-300">—</span>}
                             </td>
                             <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{call.marina}</td>
                             <td className="px-4 py-2.5">
@@ -1080,7 +1086,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-navy">Avg Speed to Lead by Property</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Business hours (Mon–Fri 9am–5pm ET) · fastest to slowest</p>
+                <p className="text-xs text-gray-400 mt-0.5">Business hours (9am–5pm, 7 days/week, marina timezone) · fastest to slowest</p>
               </div>
               {!speedData?.marinaSummary ? (
                 <LoadingSkeleton height="h-64" />
@@ -1181,6 +1187,7 @@ export default function Dashboard() {
                               <SortIcon col={col} />
                             </th>
                           ))}
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Type</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
@@ -1208,6 +1215,15 @@ export default function Dashboard() {
                               {lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined && (
                                 <span className="ml-1 text-xs font-normal text-gray-400">biz</span>
                               )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {(() => {
+                                const src = lead.leadSource;
+                                if (src === "Call") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-navy/10 text-navy whitespace-nowrap">📞 Call</span>;
+                                if (src === "Walk-in") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 whitespace-nowrap">🚶 Walk-in</span>;
+                                if (src === "Web Form") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap">📋 Web Form</span>;
+                                return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap">🌐 Digital</span>;
+                              })()}
                             </td>
                             <td className="px-4 py-3">
                               <StatusBadge status={lead.status} />
@@ -1248,7 +1264,7 @@ export default function Dashboard() {
                           </tr>
                           {expandedLead === lead.contactId && (
                             <tr key={`${lead.contactId}-detail`}>
-                              <td colSpan={9} className="bg-gray-50 px-0 py-0">
+                              <td colSpan={10} className="bg-gray-50 px-0 py-0">
                                 <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
                               </td>
                             </tr>
@@ -1257,7 +1273,7 @@ export default function Dashboard() {
                         ))}
                         {sortedLeads.length === 0 && (
                           <tr>
-                            <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm">
                               No leads found
                             </td>
                           </tr>

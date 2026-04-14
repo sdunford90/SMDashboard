@@ -36,8 +36,11 @@ export default async function handler(req, res) {
             connectedCount++;
           }
 
+          const repName = [eng.ownerName, lead.ownerName].find(
+            (n) => n && n !== "Unknown" && n !== "Unassigned"
+          ) || null;
           recentCalls.push({
-            repName: eng.ownerName || lead.ownerName,
+            repName,
             leadName: lead.name,
             direction: eng.direction,
             disposition: eng.disposition,
@@ -48,6 +51,7 @@ export default async function handler(req, res) {
             notes: eng.body || "",
             timestamp: eng.timestamp,
             hubspotUrl: lead.hubspotUrl,
+            isClosed: lead.isCustomer || false,
           });
         }
       }
