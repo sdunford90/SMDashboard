@@ -1,5 +1,4 @@
 import { getAllLeadsData, getEmailSubtype } from "../../../lib/leads";
-import { generateLeadSummary } from "../../../lib/sentiment";
 
 export default async function handler(req, res) {
   const { id } = req.query;
@@ -68,9 +67,6 @@ export default async function handler(req, res) {
       };
     });
 
-    // Generate AI summary
-    const aiSummary = await generateLeadSummary(lead);
-
     res.status(200).json({
       contactId: lead.contactId,
       name: lead.name,
@@ -85,7 +81,7 @@ export default async function handler(req, res) {
       waitingOnReply: lead.waitingOnReply,
       hasMissedInbound: lead.hasMissedInbound,
       timeline,
-      aiSummary,
+      aiSummary: null,
     });
   } catch (error) {
     console.error("Error fetching lead detail:", error);
