@@ -13,6 +13,12 @@ export default async function handler(req, res) {
         const engDate = new Date(eng.timestamp);
         if (engDate < thirtyDaysAgo) continue;
 
+        // Skip emails where the contact is an internal employee (not a real lead)
+        if (eng.type === "EMAIL") {
+          const contactEmail = (lead.email || "").toLowerCase();
+          if (contactEmail.endsWith("@southernmarinas.com")) continue;
+        }
+
         let subtype, summary;
         if (eng.type === "EMAIL") {
           subtype = getEmailSubtype(eng);
