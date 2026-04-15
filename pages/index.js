@@ -131,6 +131,7 @@ export default function Dashboard() {
   const [marinaFilter, setMarinaFilter] = useState("all");
   const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
   const [tableFilter, setTableFilter] = useState({ marina: "all" });
+  const [nameSearch, setNameSearch] = useState("");
   const [expandedLead, setExpandedLead] = useState(null);
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -306,9 +307,12 @@ export default function Dashboard() {
     : new Date(Date.now() - parseInt(leadsDateWindow, 10) * 24 * 60 * 60 * 1000);
 
   // Sorted / filtered leads table (respects its own date window)
+  // Date window is ignored when a name search is active so you can find anyone
+  const nameSearchLower = nameSearch.trim().toLowerCase();
   const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
-    if (l.createDate && new Date(l.createDate) < leadsWindowStart) return false;
+    if (!nameSearchLower && l.createDate && new Date(l.createDate) < leadsWindowStart) return false;
+    if (nameSearchLower && !(l.name || "").toLowerCase().includes(nameSearchLower)) return false;
     return true;
   });
   const sortedLeads = [...filteredLeads].sort((a, b) => {
@@ -1203,12 +1207,31 @@ export default function Dashboard() {
                       </button>
                     ))}
                   </div>
+                  {/* Name search */}
+                  <div className="relative">
+                    <svg className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search name..."
+                      value={nameSearch}
+                      onChange={(e) => setNameSearch(e.target.value)}
+                      className="text-xs border rounded pl-6 pr-2 py-1 w-36 focus:outline-none focus:ring-1 focus:ring-navy/40"
+                    />
+                    {nameSearch && (
+                      <button onClick={() => setNameSearch("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                      </button>
+                    )}
+                  </div>
+                  {/* Property filter */}
                   <select
                     value={tableFilter.marina}
                     onChange={(e) => setTableFilter((f) => ({ ...f, marina: e.target.value }))}
                     className="text-xs border rounded px-2 py-1"
                   >
-                    <option value="all">All Marinas</option>
+                    <option value="all">All Properties</option>
                     {allMarinas.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
