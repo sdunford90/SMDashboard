@@ -13,7 +13,9 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-run = ["sh", "-c", "npm run start"]
+run = ["npm", "run", "start"]
+deploymentTarget = "autoscale"
+build = ["npm", "run", "build"]
 
 [env]
 PORT = "3000"
