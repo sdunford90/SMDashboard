@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  JOB_SCORE_MIN_LEADS,
+  JOB_SCORE_WEIGHTS,
+  computePropertyRawSignals,
+  computeJobScore,
+} from "../lib/job-score";
 import Head from "next/head";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -1531,42 +1537,7 @@ export default function Dashboard() {
               {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-48" /></div>
               ) : (() => {
-                const MIN_LEADS = 5;
-                const W = { resp: 0.35, speed: 0.30, callCov: 0.25, noteCov: 0.10 };
-
-                // Sub-score normalizers — return 0..100
-                const scoreResp = (pct) => {
-                  if (pct === null) return null;
-                  if (pct >= 80) return 100;
-                  if (pct <= 20) return 0;
-                  return Math.round(((pct - 20) / 60) * 100);
-                };
-                const scoreSpeed = (mins) => {
-                  if (mins === null) return null;
-                  if (mins <= 15) return 100;
-                  if (mins >= 480) return 0;
-                  return Math.round(100 - ((mins - 15) / (480 - 15)) * 100);
-                };
-                const scoreCallCov = (pct) => {
-                  if (pct === null) return null;
-                  if (pct >= 70) return 100;
-                  if (pct <= 10) return 0;
-                  return Math.round(((pct - 10) / 60) * 100);
-                };
-                const scoreNoteCov = (pct) => {
-                  if (pct === null) return null;
-                  if (pct >= 80) return 100;
-                  if (pct <= 20) return 0;
-                  return Math.round(((pct - 20) / 60) * 100);
-                };
-
-                // Median helper (more robust than mean for speed-to-lead)
-                const median = (arr) => {
-                  if (!arr.length) return null;
-                  const s = [...arr].sort((a, b) => a - b);
-                  const mid = Math.floor(s.length / 2);
-                  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-                };
+                const W = JOB_SCORE_WEIGHTS;
 
                 const convMap = {};
                 for (const l of (conversionData?.leads || [])) {
@@ -1578,61 +1549,16 @@ export default function Dashboard() {
                   .filter(m => m !== "Unknown")
                   .map(m => {
                     const mLeads = dateFilteredLeads.filter(l => l.marina === m);
-                    const total = mLeads.length;
-                    if (total === 0) return null;
+                    if (mLeads.length === 0) return null;
 
-                    // Response rate
-                    const responded = mLeads.filter(l => l.responded).length;
-                    const respPct = Math.round((responded / total) * 100);
+                    const raw = computePropertyRawSignals(mLeads);
+                    const { jobScore, belowMinLeads, sub } = computeJobScore(raw);
 
-                    // Speed to lead (median, business hours)
-                    const speedSamples = mLeads
-                      .map(l => l.speedToLeadBizMinutes)
-                      .filter(v => v !== null && v !== undefined);
-                    const medSpeed = median(speedSamples);
-
-                    // Call coverage: % of leads with at least one outbound or logged call
-                    const withCall = mLeads.filter(l => (l.callsOutbound || 0) + (l.callsLogged || 0) > 0).length;
-                    const callCovPct = Math.round((withCall / total) * 100);
-
-                    // Note coverage: % of LOGGED calls that have notes
-                    const totalLogged = mLeads.reduce((s, l) => s + (l.callsLogged || 0), 0);
-                    const totalLoggedWithNotes = mLeads.reduce((s, l) => s + (l.callsLoggedWithNotes || 0), 0);
-                    const noteCovPct = totalLogged > 0 ? Math.round((totalLoggedWithNotes / totalLogged) * 100) : null;
-
-                    // Conversion (separate, not in score)
                     const convTotal = (leads?.leads || []).filter(l => l.marina === m).length;
                     const convCount = convMap[m] || 0;
                     const convPct = convTotal > 0 ? Math.round((convCount / convTotal) * 100) : null;
 
-                    let jobScore = null;
-                    let belowMinLeads = total < MIN_LEADS;
-                    if (!belowMinLeads) {
-                      const sResp = scoreResp(respPct);
-                      const sSpeed = scoreSpeed(medSpeed);
-                      const sCallCov = scoreCallCov(callCovPct);
-                      const sNoteCov = scoreNoteCov(noteCovPct);
-                      // Re-normalize weights across present signals (note coverage may be null when no logged calls)
-                      const parts = [
-                        { v: sResp, w: W.resp },
-                        { v: sSpeed, w: W.speed },
-                        { v: sCallCov, w: W.callCov },
-                        { v: sNoteCov, w: W.noteCov },
-                      ].filter(p => p.v !== null);
-                      const wSum = parts.reduce((s, p) => s + p.w, 0);
-                      jobScore = wSum > 0 ? Math.round(parts.reduce((s, p) => s + p.v * p.w, 0) / wSum) : null;
-                    }
-
-                    return {
-                      m, total, respPct, medSpeed, callCovPct, noteCovPct,
-                      totalLogged, convPct, jobScore, belowMinLeads,
-                      sub: {
-                        resp: scoreResp(respPct),
-                        speed: scoreSpeed(medSpeed),
-                        callCov: scoreCallCov(callCovPct),
-                        noteCov: scoreNoteCov(noteCovPct),
-                      },
-                    };
+                    return { m, ...raw, convPct, jobScore, belowMinLeads, sub };
                   })
                   .filter(Boolean)
                   .sort((a, b) => {
