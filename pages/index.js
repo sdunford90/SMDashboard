@@ -1737,64 +1737,94 @@ function LeadDetailPanel({ detail, loading }) {
 
       {/* Engagement Timeline */}
       <div>
-        <h3 className="text-sm font-semibold text-navy mb-3">Rep Activity Timeline</h3>
-        <div className="space-y-0 border-l-2 border-gray-200 ml-3">
-          {detail.timeline?.map((event, i) => (
-            <div key={i} className="relative pl-6 pb-4">
-              <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${
-                event.type === "NOTE" ? "bg-yellow-400"
-                  : event.type === "CALL"
-                  ? event.isLogged ? "bg-purple-500"
-                  : event.direction === "INBOUND" ? "bg-orange-400"
-                  : "bg-navy"
-                  : event.subtype === "EMAIL_INBOUND" ? "bg-gray-400"
-                  : event.subtype === "EMAIL_LOGGED" ? "bg-purple-500"
-                  : event.isAutomated ? "bg-gray-300"
-                  : "bg-gold"
-              }`} />
-              <div className="bg-white rounded border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {event.type === "NOTE" ? (
-                      <svg className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
-                    ) : event.type === "CALL" ? (
-                      <svg className="w-3.5 h-3.5 text-navy" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5 text-gold" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
-                    )}
-                    <span className="text-sm font-medium">{event.label}</span>
-                    {event.durationFormatted && (
-                      <span className="text-xs text-gray-400">({event.durationFormatted})</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {new Date(event.timestamp).toLocaleString()}
-                  </span>
-                </div>
-                {event.actorName && (
-                  <p className="text-xs text-indigo-600 font-medium mt-0.5">by {event.actorName}</p>
-                )}
-                {event.subject && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    <span className="font-medium">Subject:</span> {event.subject}
-                  </p>
-                )}
-                {event.bodyPreview && (
-                  <p className="text-xs text-gray-500 mt-1 italic line-clamp-3">{event.bodyPreview}</p>
-                )}
-                {event.notes && (
-                  <p className="text-xs text-gray-500 mt-1 italic line-clamp-3">{event.notes}</p>
-                )}
-                {event.sentBy && !event.actorName && (
-                  <p className="text-xs text-gray-400 mt-1">From: {event.sentBy}</p>
-                )}
-              </div>
-            </div>
-          ))}
-          {(!detail.timeline || detail.timeline.length === 0) && (
-            <p className="pl-6 text-sm text-gray-400">No engagement activity found.</p>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-navy">Rep Activity Timeline</h3>
+          {detail.timeline?.length > 0 && (
+            <span className="text-xs text-gray-400">{detail.timeline.length} {detail.timeline.length === 1 ? "event" : "events"}</span>
           )}
         </div>
+        {(!detail.timeline || detail.timeline.length === 0) ? (
+          <p className="text-sm text-gray-400">No engagement activity found.</p>
+        ) : (
+          <div className="space-y-4">
+            {(() => {
+              const groups = {};
+              const order = [];
+              for (const ev of detail.timeline) {
+                const d = new Date(ev.timestamp);
+                const key = d.toDateString();
+                if (!groups[key]) { groups[key] = []; order.push(key); }
+                groups[key].push(ev);
+              }
+              const today = new Date().toDateString();
+              const yesterday = new Date(Date.now() - 86400000).toDateString();
+              return order.map((dayKey) => {
+                let label = new Date(dayKey).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+                if (dayKey === today) label = "Today · " + label;
+                else if (dayKey === yesterday) label = "Yesterday · " + label;
+                return (
+                  <div key={dayKey}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-xs text-gray-400">{groups[dayKey].length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {groups[dayKey].map((event, i) => {
+                        const cfg = event.type === "NOTE"
+                          ? { border: "border-l-yellow-400", chipBg: "bg-yellow-50", chipText: "text-yellow-700", label: "Note" }
+                          : event.type === "CALL"
+                          ? event.isLogged
+                            ? { border: "border-l-purple-500", chipBg: "bg-purple-50", chipText: "text-purple-700", label: "Logged Call" }
+                            : event.direction === "INBOUND"
+                            ? { border: "border-l-orange-400", chipBg: "bg-orange-50", chipText: "text-orange-700", label: "Inbound Call" }
+                            : { border: "border-l-navy", chipBg: "bg-blue-50", chipText: "text-navy", label: "Outbound Call" }
+                          : event.subtype === "EMAIL_INBOUND"
+                          ? { border: "border-l-gray-400", chipBg: "bg-gray-100", chipText: "text-gray-700", label: "Inbound Email" }
+                          : event.subtype === "EMAIL_LOGGED"
+                          ? { border: "border-l-purple-500", chipBg: "bg-purple-50", chipText: "text-purple-700", label: "Logged Email" }
+                          : event.isAutomated
+                          ? { border: "border-l-gray-300", chipBg: "bg-gray-50", chipText: "text-gray-500", label: "Automated Email" }
+                          : { border: "border-l-gold", chipBg: "bg-amber-50", chipText: "text-amber-700", label: "Outbound Email" };
+                        const time = new Date(event.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                        const body = event.bodyPreview || event.notes;
+                        return (
+                          <div key={i} className={`bg-white rounded-md border border-l-4 ${cfg.border} px-3 py-2 shadow-sm`}>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${cfg.chipBg} ${cfg.chipText}`}>
+                                  {cfg.label}
+                                </span>
+                                {event.actorName && (
+                                  <span className="text-xs font-medium text-indigo-700">{event.actorName}</span>
+                                )}
+                                {event.durationFormatted && (
+                                  <span className="text-xs text-gray-400">· {event.durationFormatted}</span>
+                                )}
+                                {event.sentBy && !event.actorName && (
+                                  <span className="text-xs text-gray-500">from {event.sentBy}</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-400 whitespace-nowrap font-mono">{time}</span>
+                            </div>
+                            {(event.subject || event.label) && (
+                              <p className="text-sm text-gray-800 mt-1 truncate">
+                                {event.subject || event.label}
+                              </p>
+                            )}
+                            {body && (
+                              <p className="text-xs text-gray-500 mt-1 italic line-clamp-2">{body}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
