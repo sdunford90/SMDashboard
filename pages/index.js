@@ -136,6 +136,8 @@ export default function Dashboard() {
   const [leadDetail, setLeadDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [pageTab, setPageTab] = useState("overview");
+  const [expandedScoreRow, setExpandedScoreRow] = useState(null);
+  const [scoreHelpOpen, setScoreHelpOpen] = useState(false);
 
   const fetchCacheStatus = useCallback(async () => {
     try {
@@ -1496,61 +1498,194 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Property Performance Scorecard */}
+            {/* Property Job Score */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-navy">Property Performance Scorecard</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Based on Overview period filter ({dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}) · green ≥ threshold · yellow = ok · red = needs attention</p>
+              <div className="px-6 py-4 border-b flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-navy">Property Job Score</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">One number per property — are reps doing the job? Click a row to see the four signals behind the score. Window: {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}.</p>
+                </div>
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setScoreHelpOpen(v => !v)}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                  >
+                    How this is scored
+                  </button>
+                  {scoreHelpOpen && (
+                    <div className="absolute right-0 top-6 z-20 w-80 bg-white border rounded-lg shadow-lg p-4 text-xs text-gray-700">
+                      <div className="font-semibold text-navy mb-2">Job Score = weighted blend of four signals</div>
+                      <ul className="space-y-1.5">
+                        <li><span className="font-semibold">35% Response rate</span> — leads with any rep-initiated reply. Green ≥80%, yellow ≥50%.</li>
+                        <li><span className="font-semibold">30% Speed to lead</span> — median first reply (business hours). Green &lt;60m, yellow ≤240m.</li>
+                        <li><span className="font-semibold">25% Call coverage</span> — leads with at least one call attempt. Green ≥70%, yellow ≥40%.</li>
+                        <li><span className="font-semibold">10% Note coverage</span> — logged calls that have notes. Green ≥80%, yellow ≥50%.</li>
+                      </ul>
+                      <div className="mt-3 text-gray-500">Properties with fewer than 5 leads in the window show "—" instead of a score. Conversion is shown separately as an outcome — it's not part of the score.</div>
+                      <button onClick={() => setScoreHelpOpen(false)} className="mt-3 text-blue-600 hover:underline">Close</button>
+                    </div>
+                  )}
+                </div>
               </div>
-              {!leads?.leads || !callData?.marinaStats ? (
+              {!leads?.leads ? (
                 <div className="p-6"><LoadingSkeleton height="h-48" /></div>
               ) : (() => {
+                const MIN_LEADS = 5;
+                const W = { resp: 0.35, speed: 0.30, callCov: 0.25, noteCov: 0.10 };
+
+                // Sub-score normalizers — return 0..100
+                const scoreResp = (pct) => {
+                  if (pct === null) return null;
+                  if (pct >= 80) return 100;
+                  if (pct <= 20) return 0;
+                  return Math.round(((pct - 20) / 60) * 100);
+                };
+                const scoreSpeed = (mins) => {
+                  if (mins === null) return null;
+                  if (mins <= 15) return 100;
+                  if (mins >= 480) return 0;
+                  return Math.round(100 - ((mins - 15) / (480 - 15)) * 100);
+                };
+                const scoreCallCov = (pct) => {
+                  if (pct === null) return null;
+                  if (pct >= 70) return 100;
+                  if (pct <= 10) return 0;
+                  return Math.round(((pct - 10) / 60) * 100);
+                };
+                const scoreNoteCov = (pct) => {
+                  if (pct === null) return null;
+                  if (pct >= 80) return 100;
+                  if (pct <= 20) return 0;
+                  return Math.round(((pct - 20) / 60) * 100);
+                };
+
+                // Median helper (more robust than mean for speed-to-lead)
+                const median = (arr) => {
+                  if (!arr.length) return null;
+                  const s = [...arr].sort((a, b) => a - b);
+                  const mid = Math.floor(s.length / 2);
+                  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+                };
+
                 const convMap = {};
                 for (const l of (conversionData?.leads || [])) {
                   if (!convMap[l.marina]) convMap[l.marina] = 0;
                   convMap[l.marina]++;
                 }
+
                 const rows = allMarinas
                   .filter(m => m !== "Unknown")
                   .map(m => {
                     const mLeads = dateFilteredLeads.filter(l => l.marina === m);
                     const total = mLeads.length;
+                    if (total === 0) return null;
+
+                    // Response rate
                     const responded = mLeads.filter(l => l.responded).length;
-                    const respPct = total > 0 ? Math.round((responded / total) * 100) : null;
-                    const speedLeads = mLeads.filter(l => l.speedToLeadBizMinutes !== null);
-                    const avgSpeed = speedLeads.length > 0 ? speedLeads.reduce((s,l) => s + l.speedToLeadBizMinutes, 0) / speedLeads.length : null;
-                    const calls = callData.marinaStats[m];
-                    const connRate = calls ? calls.connectedRate : null;
+                    const respPct = Math.round((responded / total) * 100);
+
+                    // Speed to lead (median, business hours)
+                    const speedSamples = mLeads
+                      .map(l => l.speedToLeadBizMinutes)
+                      .filter(v => v !== null && v !== undefined);
+                    const medSpeed = median(speedSamples);
+
+                    // Call coverage: % of leads with at least one outbound or logged call
+                    const withCall = mLeads.filter(l => (l.callsOutbound || 0) + (l.callsLogged || 0) > 0).length;
+                    const callCovPct = Math.round((withCall / total) * 100);
+
+                    // Note coverage: % of LOGGED calls that have notes
+                    const totalLogged = mLeads.reduce((s, l) => s + (l.callsLogged || 0), 0);
+                    const totalLoggedWithNotes = mLeads.reduce((s, l) => s + (l.callsLoggedWithNotes || 0), 0);
+                    const noteCovPct = totalLogged > 0 ? Math.round((totalLoggedWithNotes / totalLogged) * 100) : null;
+
+                    // Conversion (separate, not in score)
                     const convTotal = (leads?.leads || []).filter(l => l.marina === m).length;
                     const convCount = convMap[m] || 0;
                     const convPct = convTotal > 0 ? Math.round((convCount / convTotal) * 100) : null;
 
-                    // Score each metric 0-2 (2=green,1=yellow,0=red)
-                    const scores = [];
-                    if (respPct !== null) scores.push(respPct >= 80 ? 2 : respPct >= 50 ? 1 : 0);
-                    if (avgSpeed !== null) scores.push(avgSpeed < 60 ? 2 : avgSpeed <= 240 ? 1 : 0);
-                    if (connRate !== null) scores.push(connRate >= 40 ? 2 : connRate >= 20 ? 1 : 0);
-                    if (convPct !== null) scores.push(convPct >= 20 ? 2 : convPct >= 10 ? 1 : 0);
-                    const overallScore = scores.length > 0 ? Math.round(scores.reduce((a,b)=>a+b,0) / scores.length * 50) : null;
+                    let jobScore = null;
+                    let belowMinLeads = total < MIN_LEADS;
+                    if (!belowMinLeads) {
+                      const sResp = scoreResp(respPct);
+                      const sSpeed = scoreSpeed(medSpeed);
+                      const sCallCov = scoreCallCov(callCovPct);
+                      const sNoteCov = scoreNoteCov(noteCovPct);
+                      // Re-normalize weights across present signals (note coverage may be null when no logged calls)
+                      const parts = [
+                        { v: sResp, w: W.resp },
+                        { v: sSpeed, w: W.speed },
+                        { v: sCallCov, w: W.callCov },
+                        { v: sNoteCov, w: W.noteCov },
+                      ].filter(p => p.v !== null);
+                      const wSum = parts.reduce((s, p) => s + p.w, 0);
+                      jobScore = wSum > 0 ? Math.round(parts.reduce((s, p) => s + p.v * p.w, 0) / wSum) : null;
+                    }
 
-                    return { m, total, respPct, avgSpeed, connRate, convPct, overallScore };
+                    return {
+                      m, total, respPct, medSpeed, callCovPct, noteCovPct,
+                      totalLogged, convPct, jobScore, belowMinLeads,
+                      sub: {
+                        resp: scoreResp(respPct),
+                        speed: scoreSpeed(medSpeed),
+                        callCov: scoreCallCov(callCovPct),
+                        noteCov: scoreNoteCov(noteCovPct),
+                      },
+                    };
                   })
-                  .filter(r => r.total > 0)
-                  .sort((a, b) => (b.overallScore ?? 0) - (a.overallScore ?? 0));
+                  .filter(Boolean)
+                  .sort((a, b) => {
+                    // Worst first; nulls (insufficient data) sink to bottom
+                    const av = a.jobScore === null ? 9999 : a.jobScore;
+                    const bv = b.jobScore === null ? 9999 : b.jobScore;
+                    return av - bv;
+                  });
 
-                const cell = (val, fmt, threshGreen, threshYellow, invert = false) => {
-                  if (val === null || val === undefined) return <td className="px-4 py-3 text-center text-gray-300 text-sm">--</td>;
-                  const isGreen = invert ? val <= threshGreen : val >= threshGreen;
-                  const isYellow = !isGreen && (invert ? val <= threshYellow : val >= threshYellow);
-                  const color = isGreen ? "text-emerald-600 font-semibold" : isYellow ? "text-yellow-600 font-medium" : "text-red-500 font-medium";
-                  return <td className={`px-4 py-3 text-center text-sm ${color}`}>{fmt(val)}</td>;
+                const colorFor = (score) => {
+                  if (score === null || score === undefined) return { bg: "bg-gray-100", text: "text-gray-400", bar: "bg-gray-300" };
+                  if (score >= 75) return { bg: "bg-emerald-100", text: "text-emerald-700", bar: "bg-emerald-500" };
+                  if (score >= 50) return { bg: "bg-yellow-100", text: "text-yellow-700", bar: "bg-yellow-400" };
+                  return { bg: "bg-red-100", text: "text-red-600", bar: "bg-red-500" };
                 };
 
-                const badge = (score) => {
-                  if (score === null) return <span className="text-gray-300">--</span>;
-                  if (score >= 70) return <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">{score}</span>;
-                  if (score >= 40) return <span className="inline-block px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">{score}</span>;
-                  return <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-bold">{score}</span>;
+                const ScoreBadge = ({ score, belowMin }) => {
+                  if (belowMin || score === null) {
+                    return (
+                      <span
+                        className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-400 text-sm font-bold"
+                        title={belowMin ? `Not enough data — fewer than ${MIN_LEADS} leads in this window` : "Not enough data"}
+                      >
+                        —
+                      </span>
+                    );
+                  }
+                  const c = colorFor(score);
+                  return (
+                    <span className={`inline-block px-3 py-1 rounded-full ${c.bg} ${c.text} text-sm font-bold tabular-nums`}>
+                      {score}
+                    </span>
+                  );
+                };
+
+                const SubSignal = ({ label, raw, sub, weight, hint }) => {
+                  const c = colorFor(sub);
+                  return (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</div>
+                        <div className="text-[10px] text-gray-400">{Math.round(weight * 100)}%</div>
+                      </div>
+                      <div className="mt-1 flex items-baseline justify-between gap-2">
+                        <div className="text-base font-semibold text-navy">{raw}</div>
+                        <div className={`text-sm font-bold tabular-nums ${c.text}`}>{sub === null ? "—" : sub}</div>
+                      </div>
+                      <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-full ${c.bar}`} style={{ width: `${sub === null ? 0 : sub}%` }} />
+                      </div>
+                      {hint && <div className="text-[11px] text-gray-500 mt-1.5">{hint}</div>}
+                    </div>
+                  );
                 };
 
                 return (
@@ -1560,25 +1695,74 @@ export default function Dashboard() {
                         <tr>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Property</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Leads</th>
-                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Response Rate</th>
-                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Avg Speed to Lead</th>
-                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Call Connect Rate</th>
-                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Conversion Rate</th>
-                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Score</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">Job Score</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase text-center">
+                            Outcome
+                            <div className="text-[10px] text-gray-400 normal-case font-normal">conversion</div>
+                          </th>
+                          <th className="px-4 py-3 w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map(r => (
-                          <tr key={r.m} className="border-b hover:bg-gray-50/50">
-                            <td className="px-4 py-3 text-sm font-medium">{r.m}</td>
-                            <td className="px-4 py-3 text-center text-sm text-gray-600">{r.total}</td>
-                            {cell(r.respPct, v => `${v}%`, 80, 50)}
-                            {cell(r.avgSpeed, v => formatSpeedToLead(v), 60, 240, true)}
-                            {cell(r.connRate, v => `${v}%`, 40, 20)}
-                            {cell(r.convPct, v => `${v}%`, 20, 10)}
-                            <td className="px-4 py-3 text-center">{badge(r.overallScore)}</td>
-                          </tr>
-                        ))}
+                        {rows.map(r => {
+                          const isOpen = expandedScoreRow === r.m;
+                          return (
+                            <React.Fragment key={r.m}>
+                              <tr
+                                className="border-b hover:bg-gray-50/50 cursor-pointer"
+                                onClick={() => setExpandedScoreRow(isOpen ? null : r.m)}
+                              >
+                                <td className="px-4 py-3 text-sm font-medium">{r.m}</td>
+                                <td className="px-4 py-3 text-center text-sm text-gray-600 tabular-nums">{r.total}</td>
+                                <td className="px-4 py-3 text-center"><ScoreBadge score={r.jobScore} belowMin={r.belowMinLeads} /></td>
+                                <td className="px-4 py-3 text-center text-sm text-gray-600 tabular-nums">
+                                  {r.convPct === null ? <span className="text-gray-300">—</span> : `${r.convPct}%`}
+                                </td>
+                                <td className="px-4 py-3 text-center text-gray-400 text-xs">{isOpen ? "▾" : "▸"}</td>
+                              </tr>
+                              {isOpen && (
+                                <tr className="bg-gray-50/40 border-b">
+                                  <td colSpan={5} className="px-4 py-4">
+                                    {r.belowMinLeads ? (
+                                      <div className="text-sm text-gray-500 italic">Only {r.total} lead{r.total === 1 ? "" : "s"} in this window — need at least {MIN_LEADS} to compute a reliable score.</div>
+                                    ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <SubSignal
+                                          label="Response rate"
+                                          raw={`${r.respPct}%`}
+                                          sub={r.sub.resp}
+                                          weight={W.resp}
+                                          hint="leads with any rep reply"
+                                        />
+                                        <SubSignal
+                                          label="Speed to lead"
+                                          raw={r.medSpeed === null ? "—" : formatSpeedToLead(r.medSpeed)}
+                                          sub={r.sub.speed}
+                                          weight={W.speed}
+                                          hint="median, business hours"
+                                        />
+                                        <SubSignal
+                                          label="Call coverage"
+                                          raw={`${r.callCovPct}%`}
+                                          sub={r.sub.callCov}
+                                          weight={W.callCov}
+                                          hint="leads with ≥1 call attempt"
+                                        />
+                                        <SubSignal
+                                          label="Note coverage"
+                                          raw={r.noteCovPct === null ? "—" : `${r.noteCovPct}%`}
+                                          sub={r.sub.noteCov}
+                                          weight={W.noteCov}
+                                          hint={r.totalLogged > 0 ? `${r.totalLogged} logged call${r.totalLogged === 1 ? "" : "s"}` : "no logged calls in window"}
+                                        />
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

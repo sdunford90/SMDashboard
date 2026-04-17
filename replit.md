@@ -46,7 +46,7 @@ A Next.js 14 dashboard for tracking HubSpot CRM leads across all Southern Marina
 - Up to 60 call notes returned per marina
 
 ### Insights
-- Property Performance Scorecard: Response Rate / Speed to Lead / Call Connect Rate / Conv Rate — color-coded green/yellow/red, 0–100 score badge
+- Property Job Score: single 0–100 badge per property blending response rate (35%), speed-to-lead median biz hours (30%), call coverage (25%), note coverage (10%). Click row to expand sub-signals. Conversion shown as separate Outcome column. <5 leads → "—". Sorted worst-first.
 - Call Notes Word Cloud: top 80 words sized by frequency, stop words removed
 
 ## Contact Exclusions
