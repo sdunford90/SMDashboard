@@ -1547,7 +1547,7 @@ export default function Dashboard() {
                       <div className="font-semibold text-navy mb-2">Job Score = weighted blend of four signals</div>
                       <ul className="space-y-1.5">
                         <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.resp * 100)}% Response rate</span> — leads with any rep reply. Full credit at ≥{JOB_SCORE_THRESHOLDS.resp.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.resp.redAtPct}%.</li>
-                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.speed * 100)}% Speed to lead</span> — median first reply, business hours. Full credit at ≤{JOB_SCORE_THRESHOLDS.speedBizMins.greenAtMins}m, zero at ≥{JOB_SCORE_THRESHOLDS.speedBizMins.redAtMins}m.</li>
+                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.speed * 100)}% Speed to lead</span> — average first reply, business hours. Full credit at ≤{JOB_SCORE_THRESHOLDS.speedBizMins.greenAtMins}m, zero at ≥{JOB_SCORE_THRESHOLDS.speedBizMins.redAtMins}m.</li>
                         <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.callCov * 100)}% Call coverage</span> — leads with at least one call attempt. Full credit at ≥{JOB_SCORE_THRESHOLDS.callCov.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.callCov.redAtPct}%.</li>
                         <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.noteCov * 100)}% Note coverage</span> — logged calls that have notes. Full credit at ≥{JOB_SCORE_THRESHOLDS.noteCov.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.noteCov.redAtPct}%.</li>
                       </ul>
@@ -1688,7 +1688,7 @@ export default function Dashboard() {
                                           raw={r.medSpeed === null ? "—" : formatSpeedToLead(r.medSpeed)}
                                           sub={r.sub.speed}
                                           weight={W.speed}
-                                          hint="median, business hours"
+                                          hint="average, business hours"
                                         />
                                         <SubSignal
                                           label="Call coverage"
