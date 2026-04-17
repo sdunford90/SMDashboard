@@ -115,7 +115,6 @@ export default function Dashboard() {
   const [speedData, setSpeedData] = useState(null);
   const [actionQueue, setActionQueue] = useState(null);
   const [callData, setCallData] = useState(null);
-  const [activityFeed, setActivityFeed] = useState(null);
   const [conversionData, setConversionData] = useState(null);
   const [trendsData, setTrendsData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -153,18 +152,16 @@ export default function Dashboard() {
       fetch("/api/speed-to-lead").then((r) => r.json()),
       fetch("/api/action-queue").then((r) => r.json()),
       fetch(`/api/calls?days=${callDays}`).then((r) => r.json()),
-      fetch("/api/activity-feed").then((r) => r.json()),
       fetch("/api/conversions").then((r) => r.json()),
       fetch("/api/trends").then((r) => r.json()),
     ];
-    const [leadsRes, speedRes, queueRes, callsRes, feedRes, convRes, trendsRes] =
+    const [leadsRes, speedRes, queueRes, callsRes, convRes, trendsRes] =
       await Promise.allSettled(endpoints);
 
     if (leadsRes.status === "fulfilled") setLeads(leadsRes.value);
     if (speedRes.status === "fulfilled") setSpeedData(speedRes.value);
     if (queueRes.status === "fulfilled") setActionQueue(queueRes.value);
     if (callsRes.status === "fulfilled") setCallData(callsRes.value);
-    if (feedRes.status === "fulfilled") setActivityFeed(feedRes.value);
     if (convRes.status === "fulfilled") setConversionData(convRes.value);
     if (trendsRes.status === "fulfilled") setTrendsData(trendsRes.value);
     setLastUpdated(new Date());
@@ -180,18 +177,6 @@ export default function Dashboard() {
     const interval = setInterval(fetchCacheStatus, 60000);
     return () => clearInterval(interval);
   }, [fetchCacheStatus]);
-
-  // Auto-refresh activity feed every 60s
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/activity-feed");
-        const data = await res.json();
-        setActivityFeed(data);
-      } catch {}
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -1197,10 +1182,9 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Leads Table + Activity Feed */}
-            <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-              {/* Full Leads Table */}
-              <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border overflow-hidden">
+            {/* Leads Table — activity for each lead is shown in its expanded row */}
+            <div>
+              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div className="px-6 py-4 border-b flex flex-wrap items-center gap-3">
                   <h2 className="text-lg font-semibold text-navy mr-auto">All Leads</h2>
                   <div className="flex gap-1">
@@ -1361,60 +1345,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Activity Feed */}
-              <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border overflow-hidden">
-                <div className="px-6 py-4 border-b">
-                  <h2 className="text-lg font-semibold text-navy">Activity Feed</h2>
-                  <p className="text-xs text-gray-400">Last 30 days &middot; auto-refreshes</p>
-                </div>
-                {!activityFeed?.activities ? (
-                  <div className="p-6"><LoadingSkeleton height="h-64" /></div>
-                ) : (
-                  <div className="max-h-[600px] overflow-y-auto divide-y">
-                    {activityFeed.activities?.map((activity, i) => (
-                      <div key={i} className="px-4 py-3 hover:bg-gray-50/50">
-                        <div className="flex items-start gap-3">
-                          <span className={`text-lg mt-0.5 ${
-                            activity.type === "CALL" ? "text-navy" : "text-gold"
-                          }`}>
-                            {activity.type === "CALL" ? (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                              </svg>
-                            )}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{activity.summary}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">{activity.repName}</span>
-                              <span className="text-xs text-gray-300">&middot;</span>
-                              <span className="text-xs text-gray-400">{activity.marina}</span>
-                              <span className="text-xs text-gray-300">&middot;</span>
-                              <span className="text-xs text-gray-400">{timeAgo(activity.timestamp)}</span>
-                            </div>
-                            {activity.duration && (
-                              <span className="text-xs text-gray-400">{activity.duration}</span>
-                            )}
-                            {activity.bodyPreview && (
-                              <p className="text-xs text-gray-400 mt-1 line-clamp-2 italic">{activity.bodyPreview.slice(0, 150)}{activity.bodyPreview.length > 150 ? "..." : ""}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {activityFeed.activities?.length === 0 && (
-                      <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                        No recent activity
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
           </>)}
 
