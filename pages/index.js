@@ -275,16 +275,14 @@ export default function Dashboard() {
       : null;
 
   // Action queue items — filter by date window + marina.
-  // Use the most recent activity date (latest of create date and last form
-  // submission) so a re-engaging lead reappears in recent windows even if the
-  // contact was originally created long ago.
+  // Anchor on the most recent lead-initiated activity (form fill, inbound
+  // call, or original create date) so re-engaging leads stay visible in
+  // recent windows even when the contact record itself is old.
   const filterByDateAndMarina = (arr) =>
     (arr || []).filter((i) => {
       if (summaryMarina !== "all" && i.marina !== summaryMarina) return false;
-      const createMs = i.createDate ? new Date(i.createDate).getTime() : 0;
-      const formMs = i.recentFormDate ? new Date(i.recentFormDate).getTime() : 0;
-      const latestMs = Math.max(createMs, formMs);
-      if (latestMs && latestMs < windowStart.getTime()) return false;
+      const anchor = i.lastLeadActivityAt || i.createDate;
+      if (anchor && new Date(anchor).getTime() < windowStart.getTime()) return false;
       return true;
     });
   const filteredMissedCalls = filterByDateAndMarina(actionQueue?.missedCalls);

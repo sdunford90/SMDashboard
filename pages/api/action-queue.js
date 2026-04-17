@@ -33,6 +33,13 @@ export default async function handler(req, res) {
       }))
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
 
+    // Helper: time since most recent lead-initiated activity (form fill,
+    // inbound call, or original create date). Falls back to createDate.
+    const waitMinutesFor = (l) => {
+      const anchor = l.lastLeadActivityAt || l.createDate;
+      return anchor ? (now - new Date(anchor)) / (1000 * 60) : 0;
+    };
+
     // Category 3: 3+ no-answer outbound attempts with no connection
     const multipleNoAnswer = leads
       .filter(
@@ -47,7 +54,7 @@ export default async function handler(req, res) {
         category: "multiple_no_answer",
         priority: 3,
         noAnswerCount: l.noAnswerOutboundCount,
-        waitMinutes: (now - new Date(l.createDate)) / (1000 * 60),
+        waitMinutes: waitMinutesFor(l),
       }))
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
 
@@ -64,7 +71,7 @@ export default async function handler(req, res) {
         ...formatLead(l),
         category: "never_responded",
         priority: 4,
-        waitMinutes: (now - new Date(l.createDate)) / (1000 * 60),
+        waitMinutes: waitMinutesFor(l),
       }))
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
 
@@ -72,8 +79,7 @@ export default async function handler(req, res) {
     const allUnresponded = leads
       .filter((l) => !l.responded)
       .map((l) => {
-        const ageMs = now - new Date(l.createDate);
-        const ageMinutes = ageMs / (1000 * 60);
+        const ageMinutes = waitMinutesFor(l);
         const ageHours = ageMinutes / 60;
         const ageDays = Math.floor(ageHours / 24);
         let urgency;
