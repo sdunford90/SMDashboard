@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   JOB_SCORE_MIN_LEADS,
   JOB_SCORE_WEIGHTS,
+  JOB_SCORE_THRESHOLDS,
   computePropertyRawSignals,
   computeJobScore,
 } from "../lib/job-score";
@@ -1523,12 +1524,12 @@ export default function Dashboard() {
                     <div className="absolute right-0 top-6 z-20 w-80 bg-white border rounded-lg shadow-lg p-4 text-xs text-gray-700">
                       <div className="font-semibold text-navy mb-2">Job Score = weighted blend of four signals</div>
                       <ul className="space-y-1.5">
-                        <li><span className="font-semibold">35% Response rate</span> — leads with any rep-initiated reply. Green ≥80%, yellow ≥50%.</li>
-                        <li><span className="font-semibold">30% Speed to lead</span> — median first reply (business hours). Green &lt;60m, yellow ≤240m.</li>
-                        <li><span className="font-semibold">25% Call coverage</span> — leads with at least one call attempt. Green ≥70%, yellow ≥40%.</li>
-                        <li><span className="font-semibold">10% Note coverage</span> — logged calls that have notes. Green ≥80%, yellow ≥50%.</li>
+                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.resp * 100)}% Response rate</span> — leads with any rep reply. Full credit at ≥{JOB_SCORE_THRESHOLDS.resp.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.resp.redAtPct}%.</li>
+                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.speed * 100)}% Speed to lead</span> — median first reply, business hours. Full credit at ≤{JOB_SCORE_THRESHOLDS.speedBizMins.greenAtMins}m, zero at ≥{JOB_SCORE_THRESHOLDS.speedBizMins.redAtMins}m.</li>
+                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.callCov * 100)}% Call coverage</span> — leads with at least one call attempt. Full credit at ≥{JOB_SCORE_THRESHOLDS.callCov.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.callCov.redAtPct}%.</li>
+                        <li><span className="font-semibold">{Math.round(JOB_SCORE_WEIGHTS.noteCov * 100)}% Note coverage</span> — logged calls that have notes. Full credit at ≥{JOB_SCORE_THRESHOLDS.noteCov.greenAtPct}%, zero at ≤{JOB_SCORE_THRESHOLDS.noteCov.redAtPct}%.</li>
                       </ul>
-                      <div className="mt-3 text-gray-500">Properties with fewer than 5 leads in the window show "—" instead of a score. Conversion is shown separately as an outcome — it's not part of the score.</div>
+                      <div className="mt-3 text-gray-500">Each signal scales linearly between those thresholds. Properties with fewer than {JOB_SCORE_MIN_LEADS} leads in the window show "—" instead of a score. Conversion is shown separately as an outcome — it's not part of the score.</div>
                       <button onClick={() => setScoreHelpOpen(false)} className="mt-3 text-blue-600 hover:underline">Close</button>
                     </div>
                   )}
@@ -1580,7 +1581,7 @@ export default function Dashboard() {
                     return (
                       <span
                         className="inline-block px-3 py-1 rounded-full bg-gray-100 text-gray-400 text-sm font-bold"
-                        title={belowMin ? `Not enough data — fewer than ${MIN_LEADS} leads in this window` : "Not enough data"}
+                        title={belowMin ? `Not enough data — fewer than ${JOB_SCORE_MIN_LEADS} leads in this window` : "Not enough data"}
                       >
                         —
                       </span>
@@ -1650,7 +1651,7 @@ export default function Dashboard() {
                                 <tr className="bg-gray-50/40 border-b">
                                   <td colSpan={5} className="px-4 py-4">
                                     {r.belowMinLeads ? (
-                                      <div className="text-sm text-gray-500 italic">Only {r.total} lead{r.total === 1 ? "" : "s"} in this window — need at least {MIN_LEADS} to compute a reliable score.</div>
+                                      <div className="text-sm text-gray-500 italic">Only {r.total} lead{r.total === 1 ? "" : "s"} in this window — need at least {JOB_SCORE_MIN_LEADS} to compute a reliable score.</div>
                                     ) : (
                                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                         <SubSignal
