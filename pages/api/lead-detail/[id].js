@@ -12,7 +12,13 @@ export default async function handler(req, res) {
     }
 
     // Build detailed engagement timeline
+    const ackEngId = lead.lastInboundEngagementId;
+    const ackTs = lead.lastInboundTimestamp;
     const timeline = lead.engagements.map((eng) => {
+      const isAckTarget = lead.lastInboundIsAck && (
+        (ackEngId && (eng.id === ackEngId || eng.engagementId === ackEngId)) ||
+        (!ackEngId && ackTs && eng.timestamp === ackTs && eng.type === "EMAIL")
+      );
       if (eng.type === "EMAIL") {
         const subtype = getEmailSubtype(eng);
         return {
@@ -34,6 +40,8 @@ export default async function handler(req, res) {
               : eng.emailType === "AUTOMATED"
               ? "Automated Email"
               : "Sent Email",
+          isAcknowledgment: isAckTarget || false,
+          ackReason: isAckTarget ? lead.lastInboundAckReason : null,
         };
       }
       if (eng.type === "NOTE") {
@@ -79,6 +87,8 @@ export default async function handler(req, res) {
       responded: lead.responded,
       speedToLeadMinutes: lead.speedToLeadMinutes,
       waitingOnReply: lead.waitingOnReply,
+      lastInboundIsAck: lead.lastInboundIsAck || false,
+      lastInboundAckReason: lead.lastInboundAckReason || null,
       hasMissedInbound: lead.hasMissedInbound,
       timeline,
       aiSummary: null,
