@@ -1880,6 +1880,48 @@ function LeadDetailPanel({ detail, loading }) {
         </div>
       )}
 
+      {/* Form-fill Ask */}
+      {(detail.formAsk || detail.recentFormName) && (
+        <div className="bg-white rounded-lg border p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">📋</span>
+            <h3 className="text-sm font-semibold text-navy">What they asked for</h3>
+            {detail.recentFormName && (
+              <span className="text-xs text-gray-500 truncate" title={detail.recentFormName}>
+                · via {detail.recentFormName}
+              </span>
+            )}
+          </div>
+          {detail.formAsk?.message && (
+            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed mb-3">
+              "{detail.formAsk.message}"
+            </p>
+          )}
+          {detail.formAsk && (
+            <div className="flex flex-wrap gap-2">
+              {detail.formAsk.inquiryType && (
+                <span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                  Inquiry: {detail.formAsk.inquiryType}
+                </span>
+              )}
+              {detail.formAsk.storageType && (
+                <span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                  Storage: {detail.formAsk.storageType}
+                </span>
+              )}
+              {(detail.formAsk.boatMake || detail.formAsk.boatModel || detail.formAsk.boatType || detail.formAsk.boatLoa) && (
+                <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100">
+                  Boat: {[detail.formAsk.boatMake, detail.formAsk.boatModel, detail.formAsk.boatType, detail.formAsk.boatLoa && `${detail.formAsk.boatLoa}'`].filter(Boolean).join(" · ")}
+                </span>
+              )}
+            </div>
+          )}
+          {!detail.formAsk?.message && !detail.formAsk && (
+            <p className="text-xs text-gray-400 italic">No additional details captured on the form.</p>
+          )}
+        </div>
+      )}
+
       {/* Engagement Timeline */}
       <div>
         <div className="flex items-center justify-between mb-3">
