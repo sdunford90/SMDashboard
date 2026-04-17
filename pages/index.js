@@ -1141,14 +1141,35 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-navy">Avg Speed to Lead by Property</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Business hours (9am–5pm, 7 days/week, marina timezone) · fastest to slowest</p>
+                <p className="text-xs text-gray-400 mt-0.5">Business hours (9am–5pm, 7 days/week, marina timezone) · fastest to slowest · window: {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}</p>
               </div>
-              {!speedData?.marinaSummary ? (
+              {!leads?.leads ? (
                 <LoadingSkeleton height="h-64" />
-              ) : (
-                <ResponsiveContainer width="100%" height={Math.max(280, speedData.marinaSummary.length * 36)}>
+              ) : (() => {
+                const map = {};
+                for (const l of dateFilteredLeads) {
+                  if (!l.marina || l.marina === "Unknown") continue;
+                  if (l.speedToLeadBizMinutes === null || l.speedToLeadBizMinutes === undefined) continue;
+                  if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0 };
+                  map[l.marina].sum += l.speedToLeadBizMinutes;
+                  map[l.marina].count += 1;
+                }
+                const windowSummary = Object.entries(map)
+                  .map(([marina, { sum, count }]) => ({
+                    marina,
+                    avgBizMinutes: Math.round(sum / count),
+                    respondedCount: count,
+                  }))
+                  .sort((a, b) => a.avgBizMinutes - b.avgBizMinutes);
+
+                if (windowSummary.length === 0) {
+                  return <div className="text-sm text-gray-400 italic py-8 text-center">No responded leads in this window.</div>;
+                }
+
+                return (
+                <ResponsiveContainer width="100%" height={Math.max(280, windowSummary.length * 36)}>
                   <BarChart
-                    data={speedData.marinaSummary}
+                    data={windowSummary}
                     layout="vertical"
                     margin={{ left: 16, right: 48, top: 4, bottom: 4 }}
                   >
@@ -1169,7 +1190,7 @@ export default function Dashboard() {
                       cursor={{ fill: "rgba(0,0,0,0.04)" }}
                     />
                     <Bar dataKey="avgBizMinutes" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v) => formatSpeedToLead(v) }}>
-                      {speedData.marinaSummary.map((entry) => (
+                      {windowSummary.map((entry) => (
                         <Cell
                           key={entry.marina}
                           fill={
@@ -1184,8 +1205,9 @@ export default function Dashboard() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              )}
-              {speedData?.marinaSummary && (
+                );
+              })()}
+              {leads?.leads && (
                 <div className="flex items-center gap-5 mt-3 text-xs text-gray-500">
                   <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-600"></span>Under 1 hour</span>
                   <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-600"></span>1–4 hours</span>
