@@ -33,6 +33,7 @@ export default function Presentation() {
   const [loading, setLoading] = useState(true);
   const [slide, setSlide] = useState(0);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [convPeriod, setConvPeriod] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -331,8 +332,8 @@ export default function Presentation() {
                               labelStyle={{ color: "#fff" }}
                             />
                             <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12, paddingTop: 8 }} />
-                            <Bar dataKey="Call" name="Call" stackId="a" fill="#0c2340" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
-                            <Bar dataKey="Walk-in" name="Walk-in" stackId="a" fill="#0f766e" />
+                            <Bar dataKey="Call" name="Call" stackId="a" fill="#e5e7eb" />
+                            <Bar dataKey="Walk-in" name="Walk-in" stackId="a" fill="#2dd4bf" />
                             <Bar dataKey="Web Form" name="Web Form" stackId="a" fill="#c4933f" />
                             <Bar dataKey="Digital" name="Digital / Other" stackId="a" fill="#60a5fa" radius={[0, 4, 4, 0]}
                               label={{ position: "right", fill: "rgba(255,255,255,0.5)", fontSize: 11, formatter: (v, e) => e?.payload?.total }} />
@@ -388,40 +389,107 @@ export default function Presentation() {
               )}
 
               {/* SLIDE 3: Conversions */}
-              {slide === 2 && (
+              {slide === 2 && (() => {
+                const periodOptions = [
+                  { id: "7", label: "Last 7d" },
+                  { id: "30", label: "Last 30d" },
+                  { id: "month", label: monthName },
+                  { id: "all", label: "Since Jan 1" },
+                ];
+                const convNow = new Date();
+                let cutoff = null;
+                if (convPeriod === "7") {
+                  cutoff = new Date(convNow); cutoff.setDate(cutoff.getDate() - 7);
+                } else if (convPeriod === "30") {
+                  cutoff = new Date(convNow); cutoff.setDate(cutoff.getDate() - 30);
+                } else if (convPeriod === "month") {
+                  cutoff = new Date(convNow.getFullYear(), convNow.getMonth(), 1);
+                }
+                const converted = (data.convertedLeads || []).filter((l) => {
+                  if (!cutoff) return true;
+                  if (!l.convertedAt) return false;
+                  return new Date(l.convertedAt) >= cutoff;
+                });
+                const withDays = converted.filter((l) => l.daysToConvert !== null);
+                const total = converted.length;
+                const avgDays = withDays.length > 0
+                  ? Math.round(withDays.reduce((s, l) => s + l.daysToConvert, 0) / withDays.length)
+                  : null;
+                const fastest = withDays.length > 0
+                  ? Math.min(...withDays.map((l) => l.daysToConvert))
+                  : null;
+
+                const marinaMap = {};
+                for (const l of converted) {
+                  if (!marinaMap[l.marina]) marinaMap[l.marina] = { count: 0, totalDays: 0, withDays: 0 };
+                  marinaMap[l.marina].count++;
+                  if (l.daysToConvert !== null) {
+                    marinaMap[l.marina].totalDays += l.daysToConvert;
+                    marinaMap[l.marina].withDays++;
+                  }
+                }
+                const byMarina = Object.entries(marinaMap)
+                  .map(([marina, stats]) => ({
+                    marina,
+                    count: stats.count,
+                    avgDays: stats.withDays > 0 ? Math.round(stats.totalDays / stats.withDays) : null,
+                  }))
+                  .sort((a, b) => b.count - a.count);
+
+                const periodLabel = periodOptions.find((p) => p.id === convPeriod)?.label || "All";
+
+                return (
                 <div className="flex-1 px-8 py-6 flex flex-col gap-6">
-                  <h2 className="text-2xl font-bold text-[#c4933f] tracking-wide">
-                    Conversions — Leads to Customers
-                  </h2>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-2xl font-bold text-[#c4933f] tracking-wide">
+                      Conversions — Leads to Customers
+                      <span className="text-white/40 font-normal text-base ml-3">· {periodLabel}</span>
+                    </h2>
+                    <div className="flex gap-1">
+                      {periodOptions.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => setConvPeriod(p.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                            convPeriod === p.id
+                              ? "bg-[#c4933f] text-[#0c2340] border-[#c4933f]"
+                              : "border-white/20 text-white/60 hover:text-white hover:border-white/40"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* KPI row */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
                     <KpiCard
-                      label="Total Conversions"
-                      value={data.conversionTotal ?? 0}
+                      label={`Total Conversions — ${periodLabel}`}
+                      value={total}
                       accent="text-emerald-400"
                     />
                     <KpiCard
                       label="Avg Days to Convert"
-                      value={data.conversionAvgDays !== null ? `${data.conversionAvgDays}d` : "--"}
+                      value={avgDays !== null ? `${avgDays}d` : "--"}
                       accent="text-blue-400"
                     />
                     <KpiCard
                       label="Fastest Conversion"
-                      value={data.conversionFastest !== null ? `${data.conversionFastest}d` : "--"}
+                      value={fastest !== null ? `${fastest}d` : "--"}
                       accent="text-[#c4933f]"
                       small
                     />
                   </div>
 
-                  {/* Breakdown table */}
+                  {/* Breakdown table + chart */}
                   <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5">
                     <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
                       <div className="px-5 py-3 border-b border-white/10">
-                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Conversions by Property</h3>
+                        <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest">Conversions by Property — {periodLabel}</h3>
                       </div>
-                      {!data.conversionsByMarina || data.conversionsByMarina.length === 0 ? (
-                        <div className="px-5 py-6 text-center text-white/30">No conversion data</div>
+                      {byMarina.length === 0 ? (
+                        <div className="px-5 py-6 text-center text-white/30">No conversions in this period</div>
                       ) : (
                         <table className="w-full text-sm">
                           <thead>
@@ -432,7 +500,7 @@ export default function Presentation() {
                             </tr>
                           </thead>
                           <tbody>
-                            {data.conversionsByMarina.map((row) => (
+                            {byMarina.map((row) => (
                               <tr key={row.marina} className="border-b border-white/5 hover:bg-white/5">
                                 <td className="px-5 py-2.5 font-medium">{row.marina}</td>
                                 <td className="px-5 py-2.5 text-right text-emerald-400 font-bold">{row.count}</td>
@@ -444,7 +512,7 @@ export default function Presentation() {
                             <tr className="border-t border-white/20 font-bold">
                               <td className="px-5 py-3 text-white/60 text-xs uppercase tracking-wide">Total</td>
                               <td className="px-5 py-3 text-right text-emerald-400">
-                                {data.conversionsByMarina.reduce((s, r) => s + r.count, 0)}
+                                {byMarina.reduce((s, r) => s + r.count, 0)}
                               </td>
                               <td className="px-5 py-3 text-right text-white/60"></td>
                             </tr>
@@ -455,36 +523,41 @@ export default function Presentation() {
 
                     {/* Bar chart */}
                     <div className="bg-white/5 rounded-xl border border-white/10 p-5 flex flex-col">
-                      <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest mb-4">Conversions by Property</h3>
+                      <h3 className="font-semibold text-sm text-white/70 uppercase tracking-widest mb-4">Conversions by Property — {periodLabel}</h3>
                       <div className="flex-1 min-h-[220px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={data.conversionsByMarina || []}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 60 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                            <XAxis
-                              dataKey="marina"
-                              tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
-                              angle={-40}
-                              textAnchor="end"
-                              height={70}
-                            />
-                            <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} allowDecimals={false} />
-                            <Tooltip
-                              contentStyle={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8 }}
-                              labelStyle={{ color: "#fff" }}
-                              itemStyle={{ color: "#34d399" }}
-                              formatter={(v) => [v, "Conversions"]}
-                            />
-                            <Bar dataKey="count" name="Conversions" radius={[4, 4, 0, 0]} fill="#34d399" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {byMarina.length === 0 ? (
+                          <div className="h-full flex items-center justify-center text-white/30 text-sm">No conversions in this period</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={byMarina}
+                              margin={{ top: 5, right: 10, left: 0, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                              <XAxis
+                                dataKey="marina"
+                                tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                                angle={-40}
+                                textAnchor="end"
+                                height={70}
+                              />
+                              <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} allowDecimals={false} />
+                              <Tooltip
+                                contentStyle={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8 }}
+                                labelStyle={{ color: "#fff" }}
+                                itemStyle={{ color: "#34d399" }}
+                                formatter={(v) => [v, "Conversions"]}
+                              />
+                              <Bar dataKey="count" name="Conversions" radius={[4, 4, 0, 0]} fill="#34d399" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>
