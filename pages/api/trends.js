@@ -57,19 +57,18 @@ export default async function handler(req, res) {
 
       buckets[key].overall.total += 1;
       if (lead.isCustomer) buckets[key].overall.converted += 1;
+      if (lead.responded) buckets[key].overall.responded += 1;
 
       buckets[key].byMarina[marina].total += 1;
       if (lead.isCustomer) buckets[key].byMarina[marina].converted += 1;
+      if (lead.responded) buckets[key].byMarina[marina].responded += 1;
 
-      // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
+      // Walk-ins still count toward total / responded but are excluded
+      // from the speed-to-lead metric (see lib/leads.js).
       const eligibleForSpeed = lead.leadSource !== "Walk-in";
       if (eligibleForSpeed) {
         buckets[key].overall.speedEligible += 1;
         buckets[key].byMarina[marina].speedEligible += 1;
-        if (lead.responded) {
-          buckets[key].overall.responded += 1;
-          buckets[key].byMarina[marina].responded += 1;
-        }
         if (
           lead.speedToLeadBizMinutes !== null &&
           lead.speedToLeadBizMinutes !== undefined
@@ -113,8 +112,8 @@ export default async function handler(req, res) {
           respondedCount: overall.responded,
           speedEligible: overall.speedEligible,
           respondedPct:
-            overall.speedEligible > 0
-              ? Math.round((overall.responded / overall.speedEligible) * 100)
+            overall.total > 0
+              ? Math.round((overall.responded / overall.total) * 100)
               : null,
         },
         byMarina: {},
@@ -134,7 +133,7 @@ export default async function handler(req, res) {
             respondedCount: m.responded,
             speedEligible: m.speedEligible,
             respondedPct:
-              m.speedEligible > 0 ? Math.round((m.responded / m.speedEligible) * 100) : null,
+              m.total > 0 ? Math.round((m.responded / m.total) * 100) : null,
           };
         }
       }

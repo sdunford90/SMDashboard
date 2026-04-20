@@ -1158,10 +1158,12 @@ export default function Dashboard() {
                 const map = {};
                 for (const l of dateFilteredLeads) {
                   if (!l.marina || l.marina === "Unknown") continue;
-                  if (l.leadSource === "Walk-in") continue; // excluded from speed metric
                   if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0, total: 0, respondedCount: 0 };
+                  // Walk-ins still count toward total/responded denominators,
+                  // but are excluded from the speed sum/count (see lib/leads.js).
                   map[l.marina].total += 1;
                   if (l.responded) map[l.marina].respondedCount += 1;
+                  if (l.leadSource === "Walk-in") continue;
                   if (l.speedToLeadBizMinutes === null || l.speedToLeadBizMinutes === undefined) continue;
                   map[l.marina].sum += l.speedToLeadBizMinutes;
                   map[l.marina].count += 1;
