@@ -26,6 +26,47 @@ function speedBarColor(minutes) {
   return "#f87171";
 }
 
+// Custom tooltip for the Lead Sources stacked bar — explicitly lists every
+// source in legend order with a colored swatch and value, so the Call line
+// never gets dropped by Recharts' default tooltip rendering.
+const SOURCE_ROWS = [
+  { key: "Call", label: "Call", color: "#e5e7eb" },
+  { key: "Walk-in", label: "Walk-in", color: "#2dd4bf" },
+  { key: "Web Form", label: "Web Form", color: "#c4933f" },
+  { key: "Digital", label: "Digital / Other", color: "#60a5fa" },
+];
+
+function LeadSourceTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload || {};
+  return (
+    <div style={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "8px 12px", fontSize: 12 }}>
+      <div style={{ color: "#fff", fontWeight: 600, marginBottom: 6 }}>{label}</div>
+      {SOURCE_ROWS.map((r) => (
+        <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.85)", lineHeight: 1.6 }}>
+          <span style={{ width: 10, height: 10, background: r.color, display: "inline-block", borderRadius: 2 }} />
+          <span style={{ flex: 1 }}>{r.label}</span>
+          <span style={{ fontWeight: 600 }}>{row[r.key] ?? 0}</span>
+        </div>
+      ))}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", marginTop: 6, paddingTop: 4, display: "flex", color: "#fff", fontWeight: 600 }}>
+        <span style={{ flex: 1 }}>Total</span>
+        <span>{row.total ?? 0}</span>
+      </div>
+    </div>
+  );
+}
+
+function timeAgo(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 const SLIDES = ["overview", "calls", "conversions", "sources"];
 
 export default function Presentation() {
@@ -34,6 +75,15 @@ export default function Presentation() {
   const [slide, setSlide] = useState(0);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [convPeriod, setConvPeriod] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState(null);
+
+  const fetchCacheStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cache-status");
+      if (res.ok) setCacheStatus(await res.json());
+    } catch {}
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,7 +96,44 @@ export default function Presentation() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Same flow the main dashboard uses: kick off /api/refresh, poll
+  // /api/cache-status until the background HubSpot pull finishes, then reload.
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetch("/api/refresh", { method: "POST" });
+      const poll = async () => {
+        try {
+          const res = await fetch("/api/cache-status");
+          if (res.ok) {
+            const status = await res.json();
+            setCacheStatus(status);
+            if (status.isRefreshing) {
+              setTimeout(poll, 2000);
+              return;
+            }
+          }
+        } catch {}
+        await load();
+        await fetchCacheStatus();
+        setRefreshing(false);
+      };
+      setTimeout(poll, 2000);
+    } catch {
+      setRefreshing(false);
+    }
+  }, [refreshing, load, fetchCacheStatus]);
+
+  useEffect(() => {
+    load();
+    fetchCacheStatus();
+  }, [load, fetchCacheStatus]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchCacheStatus, 60000);
+    return () => clearInterval(interval);
+  }, [fetchCacheStatus]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -77,16 +164,24 @@ export default function Presentation() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {lastRefresh && (
-              <span className="text-white/40 text-xs">
-                Updated {lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            )}
+            <span className="text-white/40 text-xs">
+              {refreshing || cacheStatus?.isRefreshing
+                ? "Refreshing data…"
+                : cacheStatus?.cachedAt
+                ? `Data from ${timeAgo(cacheStatus.cachedAt)}`
+                : lastRefresh
+                ? `Updated ${lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : ""}
+            </span>
             <button
-              onClick={load}
-              className="text-xs border border-white/20 hover:border-[#c4933f] text-white/60 hover:text-white px-3 py-1.5 rounded transition-colors"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-xs border border-white/20 hover:border-[#c4933f] text-white/60 hover:text-white px-3 py-1.5 rounded transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
-              Refresh
+              <svg className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {refreshing ? "Refreshing…" : "Refresh"}
             </button>
             <Link href="/" className="text-xs border border-white/20 hover:border-[#c4933f] text-white/60 hover:text-white px-3 py-1.5 rounded transition-colors">
               ← Dashboard
@@ -327,10 +422,7 @@ export default function Presentation() {
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" horizontal={false} />
                             <XAxis type="number" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} allowDecimals={false} />
                             <YAxis type="category" dataKey="marina" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }} width={115} />
-                            <Tooltip
-                              contentStyle={{ background: "#0c2340", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8 }}
-                              labelStyle={{ color: "#fff" }}
-                            />
+                            <Tooltip content={<LeadSourceTooltip />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
                             <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12, paddingTop: 8 }} />
                             <Bar dataKey="Call" name="Call" stackId="a" fill="#e5e7eb" />
                             <Bar dataKey="Walk-in" name="Walk-in" stackId="a" fill="#2dd4bf" />
@@ -429,6 +521,7 @@ export default function Presentation() {
                   }
                 }
                 const byMarina = Object.entries(marinaMap)
+                  .filter(([marina]) => marina && marina !== "Unknown")
                   .map(([marina, stats]) => ({
                     marina,
                     count: stats.count,

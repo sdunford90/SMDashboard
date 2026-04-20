@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       (l) => l.createDate && new Date(l.createDate) >= CUTOFF
     );
 
-    const allMarinas = [...new Set(filtered.map((l) => l.marina).filter(Boolean))].sort();
+    const allMarinas = [...new Set(filtered.map((l) => l.marina).filter((m) => m && m !== "Unknown"))].sort();
 
     const buckets = {};
 

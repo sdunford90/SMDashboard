@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       }
     }
     const byMarina = Object.entries(marinaMap)
+      .filter(([marina]) => marina && marina !== "Unknown")
       .map(([marina, stats]) => ({
         marina,
         count: stats.count,

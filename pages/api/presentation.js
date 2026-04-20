@@ -51,7 +51,7 @@ export default async function handler(req, res) {
           avgSpeedFormatted: avg !== null ? formatSpeedToLead(avg) : "--",
         };
       })
-      .filter((m) => m.total > 0)
+      .filter((m) => m.total > 0 && m.marina !== "Unknown")
       .sort((a, b) => {
         if (a.avgSpeedMinutes === null) return 1;
         if (b.avgSpeedMinutes === null) return -1;
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         marina,
         count: leads7Days.filter((l) => l.marina === marina).length,
       }))
-      .filter((m) => m.count > 0)
+      .filter((m) => m.count > 0 && m.marina !== "Unknown")
       .sort((a, b) => b.count - a.count);
 
     // Calls by location (last 7 days)
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         }
         return { marina, inbound, outbound, total: inbound + outbound };
       })
-      .filter((m) => m.total > 0)
+      .filter((m) => m.total > 0 && m.marina !== "Unknown")
       .sort((a, b) => b.total - a.total);
 
     // Lead source breakdown (all-time, all marinas)
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
         Digital: counts.Digital || 0,
         total: (counts.Call || 0) + (counts["Walk-in"] || 0) + (counts["Web Form"] || 0) + (counts.Digital || 0),
       }))
-      .filter((m) => m.total > 0)
+      .filter((m) => m.total > 0 && m.marina !== "Unknown")
       .sort((a, b) => b.total - a.total);
 
     // Conversions — return raw list so client can re-slice by period.
