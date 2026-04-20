@@ -54,14 +54,19 @@ export default async function handler(req, res) {
 
       buckets[key].overall.total += 1;
       if (lead.isCustomer) buckets[key].overall.converted += 1;
-      if (lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined) {
-        buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
-        buckets[key].overall.speedCount += 1;
-      }
 
       buckets[key].byMarina[marina].total += 1;
       if (lead.isCustomer) buckets[key].byMarina[marina].converted += 1;
-      if (lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined) {
+
+      // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
+      const eligibleForSpeed = lead.leadSource !== "Walk-in";
+      if (
+        eligibleForSpeed &&
+        lead.speedToLeadBizMinutes !== null &&
+        lead.speedToLeadBizMinutes !== undefined
+      ) {
+        buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
+        buckets[key].overall.speedCount += 1;
         buckets[key].byMarina[marina].speedSum += lead.speedToLeadBizMinutes;
         buckets[key].byMarina[marina].speedCount += 1;
       }

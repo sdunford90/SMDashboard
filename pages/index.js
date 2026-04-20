@@ -265,7 +265,10 @@ export default function Dashboard() {
   const sourceDigitalCount = summaryLeads.filter((l) => !["Call","Walk-in","Web Form"].includes(l.leadSource)).length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
-  const avgSpeedLeads = summaryLeads.filter((l) => l.speedToLeadBizMinutes !== null);
+  // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
+  const avgSpeedLeads = summaryLeads.filter(
+    (l) => l.leadSource !== "Walk-in" && l.speedToLeadBizMinutes !== null
+  );
   const avgSpeed =
     avgSpeedLeads.length > 0
       ? avgSpeedLeads.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / avgSpeedLeads.length
@@ -505,7 +508,12 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <StatCard label="Responded" value={`${respondedPct}%`} sub={`${respondedCount} of ${totalLeads}`} />
-                <StatCard label="Avg Speed to Lead" value={formatSpeedToLead(avgSpeed)} sub="business hours" />
+                <StatCard
+                  label="Avg Speed to Lead"
+                  value={formatSpeedToLead(avgSpeed)}
+                  sub={`business hours · ${respondedPct}% responded`}
+                />
+
                 <StatCard
                   label="Waiting Now"
                   value={waitingCount}
@@ -1142,6 +1150,7 @@ export default function Dashboard() {
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-navy">Avg Speed to Lead by Property</h2>
                 <p className="text-xs text-gray-400 mt-0.5">Business hours (9am–5pm, 7 days/week, marina timezone) · fastest to slowest · window: {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}</p>
+                <p className="text-[11px] text-gray-400 italic mt-0.5">Non-responded leads count their elapsed business hours (capped at 7 days). Walk-ins are excluded.</p>
               </div>
               {!leads?.leads ? (
                 <LoadingSkeleton height="h-64" />
@@ -1149,6 +1158,7 @@ export default function Dashboard() {
                 const map = {};
                 for (const l of dateFilteredLeads) {
                   if (!l.marina || l.marina === "Unknown") continue;
+                  if (l.leadSource === "Walk-in") continue; // excluded from speed metric
                   if (l.speedToLeadBizMinutes === null || l.speedToLeadBizMinutes === undefined) continue;
                   if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0 };
                   map[l.marina].sum += l.speedToLeadBizMinutes;
@@ -1309,6 +1319,9 @@ export default function Dashboard() {
                               {lead.speedToLeadBizFormatted || lead.speedToLeadFormatted}
                               {lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined && (
                                 <span className="ml-1 text-xs font-normal text-gray-400">biz</span>
+                              )}
+                              {lead.speedIsPending && (
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 align-middle">pending</span>
                               )}
                             </td>
                             <td className="px-4 py-3">

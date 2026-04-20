@@ -35,18 +35,20 @@ export default async function handler(req, res) {
     const speedByProperty = marinas
       .map((marina) => {
         const ml = leads7Days.filter((l) => l.marina === marina);
-        const responded = ml.filter((l) => l.speedToLeadBizMinutes !== null || l.speedToLeadMinutes !== null);
-        const withBiz = ml.filter((l) => l.speedToLeadBizMinutes !== null);
+        // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
+        const speedEligible = ml.filter((l) => l.leadSource !== "Walk-in");
+        const responded = ml.filter((l) => l.responded);
+        const withBiz = speedEligible.filter((l) => l.speedToLeadBizMinutes !== null);
         const avg =
           withBiz.length > 0
             ? withBiz.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / withBiz.length
-            : responded.length > 0
-            ? responded.reduce((s, l) => s + l.speedToLeadMinutes, 0) / responded.length
             : null;
+        const respondedPct = ml.length > 0 ? Math.round((responded.length / ml.length) * 100) : null;
         return {
           marina,
           total: ml.length,
           respondedCount: responded.length,
+          respondedPct,
           avgSpeedMinutes: avg !== null ? Math.round(avg) : null,
           avgSpeedFormatted: avg !== null ? formatSpeedToLead(avg) : "--",
         };

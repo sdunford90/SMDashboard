@@ -254,7 +254,12 @@ export default function Presentation() {
                             <tr key={row.marina} className="border-b border-white/5 hover:bg-white/5">
                               <td className="px-5 py-2.5 font-medium">{row.marina}</td>
                               <td className="px-5 py-2.5 text-right text-white/60">{row.total}</td>
-                              <td className="px-5 py-2.5 text-right text-white/60">{row.respondedCount}</td>
+                              <td className="px-5 py-2.5 text-right text-white/60">
+                                {row.respondedCount}
+                                {row.respondedPct !== null && (
+                                  <span className="text-white/30 text-xs ml-1">({row.respondedPct}%)</span>
+                                )}
+                              </td>
                               <td className={`px-5 py-2.5 text-right font-bold ${speedColor(row.avgSpeedMinutes)}`}>
                                 {row.avgSpeedFormatted}
                               </td>
@@ -262,6 +267,9 @@ export default function Presentation() {
                           ))}
                         </tbody>
                       </table>
+                      <p className="text-[10px] text-white/30 italic mt-3 px-5">
+                        Non-responded leads count their elapsed business hours (capped at 7 days). Walk-ins are excluded.
+                      </p>
                     </div>
 
                     {/* Bar chart */}

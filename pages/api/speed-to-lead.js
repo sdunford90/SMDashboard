@@ -8,6 +8,7 @@ export default async function handler(req, res) {
     const marinaMap = {};
     for (const lead of leads) {
       if (!lead.marina || lead.marina === "Unknown") continue;
+      if (lead.leadSource === "Walk-in") continue; // walk-ins excluded from speed metric
       if (!marinaMap[lead.marina]) marinaMap[lead.marina] = { sum: 0, count: 0 };
       if (lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined) {
         marinaMap[lead.marina].sum += lead.speedToLeadBizMinutes;
