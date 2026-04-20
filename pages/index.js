@@ -79,6 +79,138 @@ function speedToLeadColor(minutes) {
   return "text-red-600";
 }
 
+function ConvertedRoster({ conversionData, dateWindow, windowStart, summaryMarina }) {
+  const [open, setOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("convertedAt"); // convertedAt | daysToConvert | name | marina
+  const [sortDir, setSortDir] = useState("desc");
+
+  const allLeads = conversionData?.leads || [];
+  const filtered = allLeads
+    .filter((l) => summaryMarina === "all" ? true : l.marina === summaryMarina)
+    .filter((l) => dateWindow === "all" ? true : (l.convertedAt && new Date(l.convertedAt) >= windowStart));
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortBy === "name") return (a.name || "").localeCompare(b.name || "") * dir;
+    if (sortBy === "marina") return (a.marina || "").localeCompare(b.marina || "") * dir;
+    if (sortBy === "daysToConvert") {
+      const av = a.daysToConvert ?? Infinity;
+      const bv = b.daysToConvert ?? Infinity;
+      return (av - bv) * dir;
+    }
+    // convertedAt
+    const av = a.convertedAt ? new Date(a.convertedAt).getTime() : 0;
+    const bv = b.convertedAt ? new Date(b.convertedAt).getTime() : 0;
+    return (av - bv) * dir;
+  });
+
+  function toggleSort(col) {
+    if (sortBy === col) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(col);
+      setSortDir(col === "name" || col === "marina" ? "asc" : "desc");
+    }
+  }
+  function sortIndicator(col) {
+    if (sortBy !== col) return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="text-navy ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-6 py-4 border-b flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="text-left">
+          <h2 className="text-lg font-semibold text-navy flex items-center gap-2">
+            <span>Who Converted</span>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+              {sorted.length}
+            </span>
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}
+            {summaryMarina !== "all" ? ` · ${summaryMarina}` : ""} · click to {open ? "hide" : "show"} the list
+          </p>
+        </div>
+        <span className={`text-gray-400 transition-transform text-lg ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        !conversionData ? (
+          <div className="p-6"><LoadingSkeleton height="h-32" /></div>
+        ) : sorted.length === 0 ? (
+          <div className="p-6 text-sm text-gray-400 text-center">
+            No conversions in this window.
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                    Name {sortIndicator("name")}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer select-none" onClick={() => toggleSort("marina")}>
+                    Marina {sortIndicator("marina")}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Source</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer select-none" onClick={() => toggleSort("convertedAt")}>
+                    Converted {sortIndicator("convertedAt")}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase cursor-pointer select-none" onClick={() => toggleSort("daysToConvert")}>
+                    Days to Convert {sortIndicator("daysToConvert")}
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((lead) => (
+                  <tr key={lead.contactId} className="border-b hover:bg-emerald-50/30">
+                    <td className="px-4 py-3 font-medium">{lead.name}</td>
+                    <td className="px-4 py-3 text-gray-600">{lead.marina}</td>
+                    <td className="px-4 py-3">
+                      {lead.leadSource === "Call" ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy">📞 Call</span>
+                      ) : lead.leadSource === "Web Form" ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gold/10 text-gold">📋 Web Form</span>
+                      ) : lead.leadSource === "Walk-in" ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">🚶 Walk-in</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">{lead.leadSource || "Digital"}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : "--"}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-emerald-600">
+                      {lead.daysToConvert !== null && lead.daysToConvert !== undefined ? `${lead.daysToConvert}d` : "--"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.hubspotUrl && (
+                        <a
+                          href={lead.hubspotUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-gold hover:underline text-xs font-medium whitespace-nowrap"
+                        >
+                          HubSpot
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 function StatusBadge({ status }) {
   const styles = {
     Converted: "bg-emerald-100 text-emerald-800 border-emerald-200",
@@ -124,7 +256,6 @@ export default function Dashboard() {
   const [callData, setCallData] = useState(null);
   const [conversionData, setConversionData] = useState(null);
   const [trendsData, setTrendsData] = useState(null);
-  const [classifierMetrics, setClassifierMetrics] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [cacheStatus, setCacheStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -164,9 +295,8 @@ export default function Dashboard() {
       fetch(`/api/calls?days=${callDays}`).then((r) => r.json()),
       fetch("/api/conversions").then((r) => r.json()),
       fetch("/api/trends").then((r) => r.json()),
-      fetch("/api/classifier-metrics").then((r) => r.json()),
     ];
-    const [leadsRes, speedRes, queueRes, callsRes, convRes, trendsRes, classifierRes] =
+    const [leadsRes, speedRes, queueRes, callsRes, convRes, trendsRes] =
       await Promise.allSettled(endpoints);
 
     if (leadsRes.status === "fulfilled") setLeads(leadsRes.value);
@@ -175,7 +305,6 @@ export default function Dashboard() {
     if (callsRes.status === "fulfilled") setCallData(callsRes.value);
     if (convRes.status === "fulfilled") setConversionData(convRes.value);
     if (trendsRes.status === "fulfilled") setTrendsData(trendsRes.value);
-    if (classifierRes.status === "fulfilled") setClassifierMetrics(classifierRes.value);
     setLastUpdated(new Date());
   }, [callDays]);
 
@@ -1428,147 +1557,13 @@ export default function Dashboard() {
           {/* ── INSIGHTS TAB ────────────────────────────── */}
           {pageTab === "insights" && (<>
 
-            {/* AI Classifier Monitoring */}
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="px-6 py-4 border-b flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-navy">Reply Classifier Activity</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    How often the keyword + AI filter ran and what it decided
-                    {classifierMetrics?.startedAt
-                      ? ` · since ${new Date(classifierMetrics.startedAt).toLocaleString()}`
-                      : ""}
-                  </p>
-                </div>
-                <a
-                  href="/api/classifier-metrics?format=csv"
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Download recent decisions (CSV)
-                </a>
-              </div>
-              {!classifierMetrics ? (
-                <div className="p-6"><LoadingSkeleton height="h-32" /></div>
-              ) : classifierMetrics.total === 0 ? (
-                <div className="p-6 text-sm text-gray-500">
-                  No inbound replies have been classified yet. Once new email replies come in, this card will start tracking how the keyword and AI filter is being used.
-                </div>
-              ) : (
-                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-xs text-gray-500 uppercase">Total evaluations</div>
-                      <div className="text-2xl font-bold text-navy mt-1">{classifierMetrics.total}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{classifierMetrics.cacheHits} cache reuse · {classifierMetrics.freshClassifications} fresh runs</div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-xs text-gray-500 uppercase">Keyword</div>
-                      <div className="text-2xl font-bold text-emerald-600 mt-1">{classifierMetrics.pctByInvocation.keyword}%</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{classifierMetrics.invocations.keyword} of fresh runs</div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-xs text-gray-500 uppercase">AI</div>
-                      <div className="text-2xl font-bold text-indigo-600 mt-1">{classifierMetrics.pctByInvocation.ai}%</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{classifierMetrics.invocations.ai} of fresh runs</div>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="text-xs text-gray-500 uppercase">Fallback</div>
-                      <div className="text-2xl font-bold text-gray-600 mt-1">{classifierMetrics.pctByInvocation.fallback}%</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{classifierMetrics.invocations.fallback} of fresh runs</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="border rounded-lg p-4">
-                      <div className="text-sm font-semibold text-navy mb-2">Outcome split</div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="flex-1">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-gray-600">Acknowledgment (filtered out)</span>
-                            <span className="font-medium">{classifierMetrics.pctByOutcome.acknowledgment}% · {classifierMetrics.byOutcome.acknowledgment}</span>
-                          </div>
-                          <div className="h-2 bg-gray-100 rounded">
-                            <div className="h-2 bg-emerald-500 rounded" style={{ width: `${classifierMetrics.pctByOutcome.acknowledgment}%` }} />
-                          </div>
-                          <div className="flex justify-between mt-3 mb-1">
-                            <span className="text-gray-600">Needs response (kept in queue)</span>
-                            <span className="font-medium">{classifierMetrics.pctByOutcome.needs_response}% · {classifierMetrics.byOutcome.needs_response}</span>
-                          </div>
-                          <div className="h-2 bg-gray-100 rounded">
-                            <div className="h-2 bg-orange-500 rounded" style={{ width: `${classifierMetrics.pctByOutcome.needs_response}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border rounded-lg p-4">
-                      <div className="text-sm font-semibold text-navy mb-2">Top acknowledgment triggers</div>
-                      {classifierMetrics.topAckPhrases.length === 0 ? (
-                        <div className="text-xs text-gray-400">No acknowledgments yet.</div>
-                      ) : (
-                        <ul className="text-sm space-y-1">
-                          {classifierMetrics.topAckPhrases.map((p, i) => (
-                            <li key={`${p.source}-${p.phrase}-${i}`} className="flex justify-between items-center gap-2">
-                              <span className="flex items-center gap-2 min-w-0">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold ${
-                                  p.source === "ai" ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"
-                                }`}>{p.source}</span>
-                                <span className="text-gray-700 font-mono text-xs truncate" title={p.phrase}>{p.phrase}</span>
-                              </span>
-                              <span className="text-gray-500">{p.count}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-semibold text-navy mb-2">Recent decisions</div>
-                    <div className="overflow-x-auto border rounded-lg">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">When</th>
-                            <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Reason</th>
-                            <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Decision</th>
-                            <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Label</th>
-                            <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Inbound preview</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {classifierMetrics.recent.slice(0, 20).map((r, idx) => (
-                            <tr key={idx} className="border-t">
-                              <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{timeAgo(r.at)}</td>
-                              <td className="px-3 py-2 text-xs">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  r.source === "ai" ? "bg-indigo-100 text-indigo-700" :
-                                  r.source === "keyword" ? "bg-emerald-100 text-emerald-700" :
-                                  r.source === "cache" ? "bg-gray-100 text-gray-600" :
-                                  "bg-yellow-100 text-yellow-700"
-                                }`}>
-                                  {r.source}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-xs">
-                                {r.needsResponse ? (
-                                  <span className="text-orange-700 font-medium">Needs response</span>
-                                ) : (
-                                  <span className="text-emerald-700 font-medium">Acknowledgment</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-xs font-mono text-gray-600">
-                                {r.matchedPhrase ? r.matchedPhrase : (r.label || "--")}
-                              </td>
-                              <td className="px-3 py-2 text-xs text-gray-700 max-w-md truncate" title={r.preview}>{r.preview || <span className="text-gray-400">(no body)</span>}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Who Converted — collapsible roster */}
+            <ConvertedRoster
+              conversionData={conversionData}
+              dateWindow={dateWindow}
+              windowStart={windowStart}
+              summaryMarina={summaryMarina}
+            />
 
             {/* Property Job Score */}
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
