@@ -1159,16 +1159,22 @@ export default function Dashboard() {
                 for (const l of dateFilteredLeads) {
                   if (!l.marina || l.marina === "Unknown") continue;
                   if (l.leadSource === "Walk-in") continue; // excluded from speed metric
+                  if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0, total: 0, respondedCount: 0 };
+                  map[l.marina].total += 1;
+                  if (l.responded) map[l.marina].respondedCount += 1;
                   if (l.speedToLeadBizMinutes === null || l.speedToLeadBizMinutes === undefined) continue;
-                  if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0 };
                   map[l.marina].sum += l.speedToLeadBizMinutes;
                   map[l.marina].count += 1;
                 }
                 const windowSummary = Object.entries(map)
-                  .map(([marina, { sum, count }]) => ({
+                  .filter(([, v]) => v.count > 0)
+                  .map(([marina, { sum, count, total, respondedCount }]) => ({
                     marina,
                     avgBizMinutes: Math.round(sum / count),
-                    respondedCount: count,
+                    sampleCount: count,
+                    total,
+                    respondedCount,
+                    respondedPct: total > 0 ? Math.round((respondedCount / total) * 100) : 0,
                   }))
                   .sort((a, b) => a.avgBizMinutes - b.avgBizMinutes);
 
@@ -1196,10 +1202,32 @@ export default function Dashboard() {
                       width={110}
                     />
                     <Tooltip
-                      formatter={(value) => [formatSpeedToLead(value), "Avg Speed to Lead"]}
                       cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const r = payload[0].payload;
+                        return (
+                          <div className="bg-white border rounded shadow-sm px-3 py-2 text-xs">
+                            <div className="font-semibold text-navy mb-1">{r.marina}</div>
+                            <div className="text-gray-700">Avg Speed: <span className="font-semibold">{formatSpeedToLead(r.avgBizMinutes)}</span></div>
+                            <div className="text-gray-500">Responded: {r.respondedCount}/{r.total} ({r.respondedPct}%)</div>
+                          </div>
+                        );
+                      }}
                     />
-                    <Bar dataKey="avgBizMinutes" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v) => formatSpeedToLead(v) }}>
+                    <Bar
+                      dataKey="avgBizMinutes"
+                      radius={[0, 4, 4, 0]}
+                      label={{
+                        position: "right",
+                        fontSize: 11,
+                        formatter: (v, _n, props) => {
+                          const r = props && props.payload;
+                          const pct = r ? ` · ${r.respondedPct}% resp` : "";
+                          return `${formatSpeedToLead(v)}${pct}`;
+                        },
+                      }}
+                    >
                       {windowSummary.map((entry) => (
                         <Cell
                           key={entry.marina}
@@ -1321,7 +1349,7 @@ export default function Dashboard() {
                                 <span className="ml-1 text-xs font-normal text-gray-400">biz</span>
                               )}
                               {lead.speedIsPending && (
-                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 align-middle">pending</span>
+                                <span className="ml-1.5 text-[11px] font-medium text-amber-600 align-middle">(pending)</span>
                               )}
                             </td>
                             <td className="px-4 py-3">
@@ -1801,11 +1829,18 @@ export default function Dashboard() {
                 <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
               ) : (() => {
                 const chartData = trendsData.months.map((m) => {
-                  const row = { month: m.label };
-                  if (m.overall.avgSpeedBizMinutes !== null) row["Overall"] = m.overall.avgSpeedBizMinutes;
+                  const row = { month: m.label, _resp: {} };
+                  if (m.overall.avgSpeedBizMinutes !== null) {
+                    row["Overall"] = m.overall.avgSpeedBizMinutes;
+                    row._resp["Overall"] = m.overall.respondedPct;
+                  }
                   for (const marina of trendsData.marinas) {
-                    const v = m.byMarina[marina]?.avgSpeedBizMinutes;
-                    if (v !== null && v !== undefined) row[marina] = v;
+                    const bm = m.byMarina[marina];
+                    const v = bm?.avgSpeedBizMinutes;
+                    if (v !== null && v !== undefined) {
+                      row[marina] = v;
+                      row._resp[marina] = bm?.respondedPct ?? null;
+                    }
                   }
                   return row;
                 });
@@ -1818,7 +1853,29 @@ export default function Dashboard() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatSpeedToLead(v)} width={64} />
-                        <Tooltip formatter={(value, name) => [formatSpeedToLead(value), name]} />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload || !payload.length) return null;
+                            return (
+                              <div className="bg-white border rounded shadow-sm px-3 py-2 text-xs">
+                                <div className="font-semibold text-navy mb-1">{label}</div>
+                                {payload.map((p) => {
+                                  const pct = p.payload?._resp?.[p.name];
+                                  return (
+                                    <div key={p.name} className="flex items-center gap-2">
+                                      <span className="inline-block w-2 h-2 rounded-sm" style={{ background: p.color }} />
+                                      <span className="text-gray-700">{p.name}:</span>
+                                      <span className="font-semibold">{formatSpeedToLead(p.value)}</span>
+                                      {pct !== null && pct !== undefined && (
+                                        <span className="text-gray-400">({pct}% resp)</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }}
+                        />
                         <Legend />
                         {keys.map((key, i) => (
                           <Line
@@ -1834,7 +1891,7 @@ export default function Dashboard() {
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
-                    <p className="text-xs text-gray-400 mt-2">Lower is better · gaps indicate no data for that marina/month</p>
+                    <p className="text-xs text-gray-400 mt-2">Lower is better · non-responded leads count their elapsed business hours (capped at 7 days) · walk-ins excluded · hover for response rate</p>
                   </>
                 );
               })()}

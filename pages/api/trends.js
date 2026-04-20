@@ -44,12 +44,15 @@ export default async function handler(req, res) {
       const key = monthKey(d.getUTCFullYear(), d.getUTCMonth() + 1);
 
       if (!buckets[key]) {
-        buckets[key] = { overall: { speedSum: 0, speedCount: 0, total: 0, converted: 0 }, byMarina: {} };
+        buckets[key] = {
+          overall: { speedSum: 0, speedCount: 0, total: 0, converted: 0, speedEligible: 0, responded: 0 },
+          byMarina: {},
+        };
       }
 
       const marina = lead.marina || "Unknown";
       if (!buckets[key].byMarina[marina]) {
-        buckets[key].byMarina[marina] = { speedSum: 0, speedCount: 0, total: 0, converted: 0 };
+        buckets[key].byMarina[marina] = { speedSum: 0, speedCount: 0, total: 0, converted: 0, speedEligible: 0, responded: 0 };
       }
 
       buckets[key].overall.total += 1;
@@ -60,15 +63,22 @@ export default async function handler(req, res) {
 
       // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
       const eligibleForSpeed = lead.leadSource !== "Walk-in";
-      if (
-        eligibleForSpeed &&
-        lead.speedToLeadBizMinutes !== null &&
-        lead.speedToLeadBizMinutes !== undefined
-      ) {
-        buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
-        buckets[key].overall.speedCount += 1;
-        buckets[key].byMarina[marina].speedSum += lead.speedToLeadBizMinutes;
-        buckets[key].byMarina[marina].speedCount += 1;
+      if (eligibleForSpeed) {
+        buckets[key].overall.speedEligible += 1;
+        buckets[key].byMarina[marina].speedEligible += 1;
+        if (lead.responded) {
+          buckets[key].overall.responded += 1;
+          buckets[key].byMarina[marina].responded += 1;
+        }
+        if (
+          lead.speedToLeadBizMinutes !== null &&
+          lead.speedToLeadBizMinutes !== undefined
+        ) {
+          buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
+          buckets[key].overall.speedCount += 1;
+          buckets[key].byMarina[marina].speedSum += lead.speedToLeadBizMinutes;
+          buckets[key].byMarina[marina].speedCount += 1;
+        }
       }
     }
 
@@ -81,9 +91,9 @@ export default async function handler(req, res) {
       if (!bucket) {
         const byMarina = {};
         for (const marina of allMarinas) {
-          byMarina[marina] = { avgSpeedBizMinutes: null, conversionRate: null, total: 0 };
+          byMarina[marina] = { avgSpeedBizMinutes: null, conversionRate: null, total: 0, respondedPct: null, respondedCount: 0, speedEligible: 0 };
         }
-        return { month: key, label, overall: { avgSpeedBizMinutes: null, conversionRate: null, total: 0 }, byMarina };
+        return { month: key, label, overall: { avgSpeedBizMinutes: null, conversionRate: null, total: 0, respondedPct: null, respondedCount: 0, speedEligible: 0 }, byMarina };
       }
 
       const overall = bucket.overall;
@@ -100,6 +110,12 @@ export default async function handler(req, res) {
               ? Math.round((overall.converted / overall.total) * 1000) / 10
               : null,
           total: overall.total,
+          respondedCount: overall.responded,
+          speedEligible: overall.speedEligible,
+          respondedPct:
+            overall.speedEligible > 0
+              ? Math.round((overall.responded / overall.speedEligible) * 100)
+              : null,
         },
         byMarina: {},
       };
@@ -107,7 +123,7 @@ export default async function handler(req, res) {
       for (const marina of allMarinas) {
         const m = bucket.byMarina[marina];
         if (!m) {
-          row.byMarina[marina] = { avgSpeedBizMinutes: null, conversionRate: null, total: 0 };
+          row.byMarina[marina] = { avgSpeedBizMinutes: null, conversionRate: null, total: 0, respondedPct: null, respondedCount: 0, speedEligible: 0 };
         } else {
           row.byMarina[marina] = {
             avgSpeedBizMinutes:
@@ -115,6 +131,10 @@ export default async function handler(req, res) {
             conversionRate:
               m.total > 0 ? Math.round((m.converted / m.total) * 1000) / 10 : null,
             total: m.total,
+            respondedCount: m.responded,
+            speedEligible: m.speedEligible,
+            respondedPct:
+              m.speedEligible > 0 ? Math.round((m.responded / m.speedEligible) * 100) : null,
           };
         }
       }
