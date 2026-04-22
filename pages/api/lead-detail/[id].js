@@ -54,6 +54,20 @@ export default async function handler(req, res) {
           label: "Note",
         };
       }
+      if (eng.type === "MEETING") {
+        const titlePart = eng.title ? ` -- ${eng.title}` : "";
+        return {
+          type: "MEETING",
+          subtype: "MEETING",
+          timestamp: eng.timestamp,
+          startTime: eng.startTime || null,
+          endTime: eng.endTime || null,
+          outcome: eng.outcome || null,
+          notes: eng.body || "",
+          actorName: eng.ownerName || null,
+          label: `Meeting${titlePart}`,
+        };
+      }
       return {
         type: "CALL",
         subtype: eng.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL",

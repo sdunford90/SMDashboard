@@ -29,6 +29,13 @@ export default async function handler(req, res) {
               ? "Logged email to"
               : "Sent email to";
           summary = `${dirLabel} ${lead.name}${eng.subject ? " -- " + eng.subject : ""}`;
+        } else if (eng.type === "MEETING") {
+          subtype = "MEETING";
+          const titlePart = eng.title ? ` -- ${eng.title}` : "";
+          summary = `Meeting with ${lead.name}${titlePart}`;
+        } else if (eng.type === "NOTE") {
+          // Notes aren't part of the rep activity feed surface today.
+          continue;
         } else {
           subtype =
             eng.direction === "INBOUND" ? "INBOUND_CALL"
