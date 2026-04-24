@@ -1,0 +1,93 @@
+4 12:43:19.50
+7a250472
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-04-24 12:43:19.50
+7a250472
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-04-24 12:43:19.50
+7a250472
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-04-24 12:43:19.50
+7a250472
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-04-24 12:43:19.50
+7a250472
+User
+To prepare for this change:
+2026-04-24 12:43:19.50
+7a250472
+User
+(node:30) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-04-24 12:43:19.50
+7a250472
+User
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-04-24 12:43:21.59
+7a250472
+User
+[cache] Starting background refresh of HubSpot data...
+2026-04-24 12:43:21.59
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:43:21.60
+7a250472
+User
+[warmup] Cache warm — leads data ready.
+2026-04-24 12:47:40.75
+7a250472
+User
+[cache] Starting background refresh of HubSpot data...
+
+2026-04-24 12:47:40.75
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:47:42.17
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:47:42.36
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:47:42.55
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:47:42.92
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 12:47:43.20
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:30.64
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:31.05
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:31.74
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:32.07
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:32.26
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
+2026-04-24 13:01:32.61
+7a250472
+User
+[cache] Serving stale DB cache, triggering background refresh...
