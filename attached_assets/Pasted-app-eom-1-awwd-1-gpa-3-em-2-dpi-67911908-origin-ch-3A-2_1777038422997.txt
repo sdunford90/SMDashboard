@@ -1,0 +1,17 @@
+app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=ch…%3A%2F%2Fnew-tab-page&cn=app&pid=1&spid=243&hl=en	200	document		21.7 kB	166 ms
+m=_b,_tp	200	script	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:19	76.9 kB	75 ms
+sm-dashboard.replit.app	(pending)	document	Other	0.0 kB	Pending
+tag_assistant_api_bin.js	200	script	content_script_bin.js:8	13.4 kB	4 ms
+ImageACg8ocJ0tSiGzbT8QYOr3PxKba0j7bMoH5KP9lP6sCYiip2UUofkPA=s128-b16-cc-rp-mo	200	png	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:31	(disk cache)	3 ms
+Imagep_2x_d075c781870b.png	200	png	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:31	(disk cache)	4 ms
+KFOlCnqEu92Fr1MmEU9fBBc4.woff2	200	font	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:31	(disk cache)	4 ms
+KFOmCnqEu92Fr1Mu4mxK.woff2	200	font	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:31	(disk cache)	4 ms
+4UaRrENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iq2vgCI.woff2	200	font	app?eom=1&awwd=1&gpa=3&em=2&dpi=67911908&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome…:31	(disk cache)	6 ms
+m=ws9Tlc,O6y8ed,aW3pY,GkRiKb,e5qFLc,IZT63,YYmHzb,p…,hKSk3e,Z5uLle,MdUzUe,zbML3c,zr1jrb,Uas9Hd,pjICDe	200	script	m=_b,_tp:430	125 kB	37 ms
+m=Ujeq8,B0tIqf,AZNOqf,ZbP0xe	200	script	m=_b,_tp:430	5.8 kB	20 ms
+m=p3hmRc,LvGhrf,RqjULd	200	script	m=_b,_tp:430	8.4 kB	18 ms
+m=sOXFj,q0xTif,YOiC1e	200	script	m=_b,_tp:430	8.6 kB	18 ms
+m=P6sQOc	200	script	m=_b,_tp:430	1.1 kB	18 ms
+m=IiCRgf	200	script	m=_b,_tp:430	3.9 kB	18 ms
+m=Wt6vjf,hhhU8,FCpbqb,WhJNk	200	script	m=_b,_tp:430	1.6 kB	21 ms
+log?hasfast=true&auth=SAPISIDHASH+a284a18f56ddcd74…7428bbd8b758c718be8c797897&authuser=0&format=json	200	ping	m=ws9Tlc,O6y8ed,aW3pY,GkRiKb,e5qFLc,IZT63,YYmHzb,pw70Gc,n73qwf,UUJqVe,KUM7Z…,kjKdXe,BVgquf,SpsfSb,hKSk3e,Z5uLle,MdUzUe,zbML3c,zr1jrb,Uas9Hd,pjICDe:981	0.2 kB	75 ms
