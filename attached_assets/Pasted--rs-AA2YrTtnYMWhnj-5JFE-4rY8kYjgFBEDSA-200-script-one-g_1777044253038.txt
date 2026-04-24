@@ -1,0 +1,27 @@
+
+rs=AA2YrTtnYMWhnj_5JFE_4rY8kYjgFBEDSA	200	script	one-google-bar?paramsencoded=:252	(disk cache)	4 ms
+one_google_bar.js	200	script	one-google-bar?paramsencoded=:257	4.3 kB	0 ms
+rs=AA2YrTvjm3gfcT8z8P1WhtTK58OWs4wlSQ	200	stylesheet	one-google-bar?paramsencoded=:252	(disk cache)	3 ms
+one_google_bar_api.js	200	script	one_google_bar.js:4	1.2 kB	0 ms
+GetAsyncData	200	xhr	rs=AA2YrTtnYMWhnj_5JFE_4rY8kYjgFBEDSA:55	0.1 kB	96 ms
+ImageAF2bZyiXiPWIijhlPtzGRe1SoErLhMsG6DtKTeN43Fb_MpPL_P…W_H5CSzmnhO0raD8fK9CxcOpfqZKp8GmBz_7rsp0R2c=s32-c	200	png	one-google-bar?paramsencoded=:72	0.6 kB	59 ms
+Imagegooglelogo_surface_dark_74x24px.svg	200	svg+xml	Other	(disk cache)	1 ms
+log?format=json&hasfast=true&authuser=0	200	xhr	rs=AA2YrTtnYMWhnj_5JFE_4rY8kYjgFBEDSA:55	0.2 kB	72 ms
+microsoft_auth.mojom-webui.js	200	script	lazy_load.js:4	6.5 kB	0 ms
+google_calendar.mojom-webui.js	200	script	lazy_load.js:4	6.6 kB	0 ms
+outlook_calendar.mojom-webui.js	200	script	lazy_load.js:4	6.6 kB	0 ms
+drive_suggestion.mojom-webui.js	200	script	lazy_load.js:4	6.4 kB	1 ms
+microsoft_files.mojom-webui.js	200	script	lazy_load.js:4	6.5 kB	1 ms
+most_relevant_tab_resumption.mojom-webui.js	200	script	lazy_load.js:4	10.5 kB	401 ms
+url_visit_types.mojom-webui.js	200	script	lazy_load.js:4	4.1 kB	0 ms
+tab_group_types.mojom-webui.js	200	script	lazy_load.js:4	0.9 kB	1 ms
+tab_groups.mojom-webui.js	200	script	lazy_load.js:4	9.1 kB	0 ms
+page_image_service.mojom-webui.js	200	script	lazy_load.js:4	4.7 kB	0 ms
+calendar_data.mojom-webui.js	200	script	google_calendar.mojom-webui.js:6	2.3 kB	0 ms
+file_suggestion.mojom-webui.js	200	script	lazy_load.js:4	2.2 kB	23 ms
+Imagedata:image/gif;base…	200	gif	lazy_load.js:890	(memory cache)	3 ms
+Image?size=24&scaleFactor=1x&showFallbackMonogram=&page…=https%3A%2F%2Frentals.sanmarcomarina.com%2Fadmin	200	png	lit.rollup.js:16	0.9 kB	205 ms
+Image?size=24&scaleFactor=1x&showFallbackMonogram=&pageUrl=https%3A%2F%2Fclaude.ai%2Fnew	200	png	lit.rollup.js:16	1.5 kB	205 ms
+67 requests
+409 kB transferred
+2.3 MB resources
