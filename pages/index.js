@@ -1512,7 +1512,7 @@ export default function Dashboard() {
                                 let label = (fr.subtype || fr.type || "").replace(/_/g, " ").toLowerCase();
                                 if (fr.type === "EMAIL") {
                                   icon = "📧";
-                                  label = fr.subtype === "EMAIL_INBOUND" ? "inbound email" : fr.subtype === "EMAIL_LOGGED" ? "logged email" : "email";
+                                  label = fr.subtype === "EMAIL_INBOUND" ? "inbound email" : "email sent";
                                 } else if (fr.type === "CALL") {
                                   icon = "📞";
                                   label = fr.subtype === "INBOUND_CALL" ? "inbound call" : "outbound call";
@@ -1571,13 +1571,12 @@ export default function Dashboard() {
                                 const total = (lead.emailsSent || 0) + (lead.emailsLogged || 0);
                                 if (total === 0) return <span className="text-gray-400">—</span>;
                                 return (
-                                  <>
-                                    <div className="font-semibold text-sm text-gray-800">📧 {total}</div>
-                                    <div className="text-[11px] text-gray-500" title="Sent through HubSpot · Logged manually by rep">
-                                      {lead.emailsSent || 0} sent
-                                      {lead.emailsLogged > 0 && <> · {lead.emailsLogged} logged</>}
-                                    </div>
-                                  </>
+                                  <div
+                                    className="font-semibold text-sm text-gray-800"
+                                    title={`Total emails sent (${lead.emailsSent || 0} via HubSpot mail tool, ${lead.emailsLogged || 0} sent from Gmail/Outlook and logged in HubSpot)`}
+                                  >
+                                    📧 {total}
+                                  </div>
                                 );
                               })()}
                             </td>
