@@ -51,3 +51,7 @@ outputType = "webview"
 
 [userenv.shared]
 DISABLE_AI_CLASSIFIER = "true"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000

@@ -15,7 +15,8 @@ A Next.js 14 dashboard for tracking HubSpot CRM leads across all Southern Marina
 
 - `lib/leads.js` — Core data fetching, processing, caching, and classification logic
 - `lib/hubspot.js` — HubSpot API client singleton
-- `lib/db.js` — PostgreSQL connection + persistent cache helpers
+- `lib/db.js` — PostgreSQL connection + persistent cache helpers + classifier decision store
+- `lib/ack-classifier.js` — Reply classifier; persists decisions to `classifier_decisions` so Insights stats survive restarts (90d retention, pruned every 6h)
 - `middleware.js` — Session cookie auth protecting all routes except `/login`
 - `instrumentation.js` — Warmup: pre-loads HubSpot data into cache on server start
 - `pages/index.js` — Main dashboard UI (all tabs)

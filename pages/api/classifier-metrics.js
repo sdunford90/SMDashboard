@@ -9,9 +9,9 @@ function csvEscape(val) {
   return s;
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    const m = getClassifierMetrics();
+    const m = await getClassifierMetrics();
     if ((req.query.format || "").toLowerCase() === "csv") {
       const header = ["timestamp", "engagementId", "type", "source", "reason", "confidence", "label", "matchedPhrase", "needsResponse", "preview"];
       const lines = [header.join(",")];
