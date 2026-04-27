@@ -460,6 +460,11 @@ export default function Dashboard() {
       const bv = b.speedToLeadMinutes ?? 999999;
       return dir * (av - bv);
     }
+    if (col === "firstResponseTime") {
+      const av = a.firstResponseTime ? new Date(a.firstResponseTime).getTime() : 0;
+      const bv = b.firstResponseTime ? new Date(b.firstResponseTime).getTime() : 0;
+      return dir * (av - bv);
+    }
     if (col === "waitMinutes") {
       const aw = a.waitingSince ? Date.now() - new Date(a.waitingSince).getTime() : a.responded ? -1 : Date.now() - new Date(a.createDate).getTime();
       const bw = b.waitingSince ? Date.now() - new Date(b.waitingSince).getTime() : b.responded ? -1 : Date.now() - new Date(b.createDate).getTime();
@@ -1439,7 +1444,8 @@ export default function Dashboard() {
                           {[
                             { col: "name", label: "Name" },
                             { col: "marina", label: "Marina" },
-                            { col: "createDate", label: "Created" },
+                            { col: "createDate", label: "Lead In" },
+                            { col: "firstResponseTime", label: "First Response" },
                             { col: "speedToLeadMinutes", label: "Speed to Lead" },
                           ].map(({ col, label }) => (
                             <th
@@ -1471,8 +1477,60 @@ export default function Dashboard() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-sm">{lead.marina}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {new Date(lead.createDate).toLocaleDateString()}
+                            <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                              {(() => {
+                                const formTs = lead.recentFormDate || lead.firstFormDate;
+                                const isWebish = lead.leadSource === "Web Form" || lead.leadSource === "Digital";
+                                const ts = isWebish && formTs ? formTs : lead.createDate;
+                                const d = new Date(ts);
+                                return (
+                                  <>
+                                    <div>{d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</div>
+                                    <div className="text-xs text-gray-500">{d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+                                    {isWebish && lead.recentFormName && (
+                                      <div className="text-[11px] text-amber-700 mt-0.5 max-w-[180px] truncate" title={lead.recentFormName}>📋 {lead.recentFormName}</div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                              {(() => {
+                                const fr = lead.firstResponse;
+                                if (!lead.responded || !fr || !fr.timestamp) {
+                                  return <span className="text-gray-400 text-xs italic">—</span>;
+                                }
+                                if (fr.synthetic || fr.type === "SYNTHETIC") {
+                                  return (
+                                    <div className="text-xs text-gray-500 italic" title="Logged at intake — rep already spoke with prospect when contact was created">
+                                      logged at intake
+                                    </div>
+                                  );
+                                }
+                                const d = new Date(fr.timestamp);
+                                let icon = "•";
+                                let label = (fr.subtype || fr.type || "").replace(/_/g, " ").toLowerCase();
+                                if (fr.type === "EMAIL") {
+                                  icon = "📧";
+                                  label = fr.subtype === "EMAIL_INBOUND" ? "inbound email" : fr.subtype === "EMAIL_LOGGED" ? "logged email" : "email";
+                                } else if (fr.type === "CALL") {
+                                  icon = "📞";
+                                  label = fr.subtype === "INBOUND_CALL" ? "inbound call" : "outbound call";
+                                } else if (fr.type === "MEETING") {
+                                  icon = "🤝";
+                                  label = "meeting";
+                                } else if (fr.type === "NOTE") {
+                                  icon = "📝";
+                                  label = "note";
+                                }
+                                return (
+                                  <>
+                                    <div>{d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</div>
+                                    <div className="text-xs text-gray-500">{d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+                                    <div className="text-[11px] text-gray-600 mt-0.5">{icon} {label}</div>
+                                  </>
+                                );
+                              })()}
                             </td>
                             <td className={`px-4 py-3 text-sm font-semibold ${speedToLeadColor(lead.speedToLeadBizMinutes ?? lead.speedToLeadMinutes)}`}>
                               {lead.speedToLeadBizFormatted || lead.speedToLeadFormatted}
@@ -1508,15 +1566,35 @@ export default function Dashboard() {
                                 ? `${lead.lastTouch.subtype?.replace(/_/g, " ").toLowerCase()} ${timeAgo(lead.lastTouch.timestamp)}`
                                 : "--"}
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-600">
-                              <span title="Sent">{lead.emailsSent}s</span>{" "}
-                              <span title="Logged">{lead.emailsLogged}l</span>
+                            <td className="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+                              {(() => {
+                                const total = (lead.emailsSent || 0) + (lead.emailsLogged || 0);
+                                if (total === 0) return <span className="text-gray-400">—</span>;
+                                return (
+                                  <>
+                                    <div className="font-semibold text-sm text-gray-800">📧 {total}</div>
+                                    <div className="text-[11px] text-gray-500" title="Sent through HubSpot · Logged manually by rep">
+                                      {lead.emailsSent || 0} sent
+                                      {lead.emailsLogged > 0 && <> · {lead.emailsLogged} logged</>}
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-600">
-                              <span title="Outbound">{lead.callsOutbound}o</span>{" "}
-                              <span title="Inbound">{lead.callsInbound}i</span>{" "}
-                              <span title="Connected" className="text-green-600">{lead.callsConnected}c</span>{" "}
-                              {lead.callsLogged > 0 && <span title="Logged" className="text-purple-600">{lead.callsLogged}lg</span>}
+                            <td className="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+                              {(() => {
+                                const total = (lead.callsOutbound || 0) + (lead.callsInbound || 0);
+                                if (total === 0) return <span className="text-gray-400">—</span>;
+                                return (
+                                  <>
+                                    <div className="font-semibold text-sm text-gray-800">📞 {total}</div>
+                                    <div className="text-[11px] text-gray-500" title="Outbound attempts · Inbound from lead · Connected calls">
+                                      {lead.callsOutbound || 0} out · {lead.callsInbound || 0} in
+                                      {lead.callsConnected > 0 && <> · <span className="text-emerald-600 font-medium">{lead.callsConnected} connected</span></>}
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                               <a

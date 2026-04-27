@@ -1,5 +1,48 @@
 import { getAllLeadsData, formatSpeedToLead } from "../../lib/leads";
 
+// Synthesize firstResponse object from cached engagements when the cached
+// lead pre-dates the firstResponse field rollout (avoids requiring a full
+// HubSpot refresh for the new All Leads columns to render).
+function deriveFirstResponse(lead) {
+  if (lead.firstResponse) return lead.firstResponse;
+  if (!lead.responded || !lead.firstResponseTime) return null;
+  const engs = lead.engagements || [];
+  const targetMs = new Date(lead.firstResponseTime).getTime();
+  // Pick the engagement closest to firstResponseTime that is a meaningful response type.
+  let best = null;
+  let bestDelta = Infinity;
+  for (const e of engs) {
+    if (!e.timestamp) continue;
+    if (e.type !== "EMAIL" && e.type !== "CALL" && e.type !== "MEETING" && e.type !== "NOTE") continue;
+    const delta = Math.abs(new Date(e.timestamp).getTime() - targetMs);
+    if (delta < bestDelta) {
+      best = e;
+      bestDelta = delta;
+    }
+  }
+  if (!best) {
+    return { type: "SYNTHETIC", subtype: "SYNTHETIC", timestamp: lead.firstResponseTime, disposition: null, synthetic: true };
+  }
+  let subtype = null;
+  if (best.type === "EMAIL") {
+    const dir = best.direction;
+    if (dir === "INCOMING" || dir === "INBOUND" || dir === "INCOMING_EMAIL") subtype = "EMAIL_INBOUND";
+    else if (best.loggedFrom === "CRM") subtype = "EMAIL_LOGGED";
+    else subtype = "EMAIL_SENT";
+  } else if (best.type === "CALL") {
+    subtype = best.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL";
+  } else {
+    subtype = best.type;
+  }
+  return {
+    type: best.type,
+    subtype,
+    timestamp: best.timestamp,
+    disposition: best.disposition || null,
+    synthetic: false,
+  };
+}
+
 export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
@@ -34,6 +77,7 @@ export default async function handler(req, res) {
       callsLogged: lead.callsLogged,
       callsLoggedWithNotes: lead.callsLoggedWithNotes || 0,
       lastTouch: lead.lastTouch,
+      firstResponse: deriveFirstResponse(lead),
       lastLeadActivityAt: lead.lastLeadActivityAt,
       hubspotUrl: lead.hubspotUrl,
       leadSource: lead.leadSource,
