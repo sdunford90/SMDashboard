@@ -288,23 +288,38 @@ export default function Dashboard() {
   }, []);
 
   const fetchAll = useCallback(async () => {
+    // Wrap each endpoint so a network failure or non-JSON response (e.g.
+    // a 502 HTML body during a refresh) resolves to null instead of
+    // rejecting. Without this, the initial Promise.allSettled would mark
+    // the slot "rejected", we'd never call setLeads, and the dashboard
+    // would stay on the loading skeleton forever.
+    const safeJson = (url) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
     const endpoints = [
-      fetch("/api/leads").then((r) => r.json()),
-      fetch("/api/speed-to-lead").then((r) => r.json()),
-      fetch("/api/action-queue").then((r) => r.json()),
-      fetch(`/api/calls?days=${callDays}`).then((r) => r.json()),
-      fetch("/api/conversions").then((r) => r.json()),
-      fetch("/api/trends").then((r) => r.json()),
+      safeJson("/api/leads"),
+      safeJson("/api/speed-to-lead"),
+      safeJson("/api/action-queue"),
+      safeJson(`/api/calls?days=${callDays}`),
+      safeJson("/api/conversions"),
+      safeJson("/api/trends"),
     ];
     const [leadsRes, speedRes, queueRes, callsRes, convRes, trendsRes] =
       await Promise.allSettled(endpoints);
 
-    if (leadsRes.status === "fulfilled") setLeads(leadsRes.value);
-    if (speedRes.status === "fulfilled") setSpeedData(speedRes.value);
-    if (queueRes.status === "fulfilled") setActionQueue(queueRes.value);
-    if (callsRes.status === "fulfilled") setCallData(callsRes.value);
-    if (convRes.status === "fulfilled") setConversionData(convRes.value);
-    if (trendsRes.status === "fulfilled") setTrendsData(trendsRes.value);
+    // Always call setLeads so the loading skeleton clears even if the API
+    // failed — the empty shape lets the dashboard render with "no leads".
+    const leadsValue =
+      leadsRes.status === "fulfilled" && leadsRes.value && Array.isArray(leadsRes.value.leads)
+        ? leadsRes.value
+        : { leads: [], total: 0 };
+    setLeads(leadsValue);
+    if (speedRes.status === "fulfilled" && speedRes.value) setSpeedData(speedRes.value);
+    if (queueRes.status === "fulfilled" && queueRes.value) setActionQueue(queueRes.value);
+    if (callsRes.status === "fulfilled" && callsRes.value) setCallData(callsRes.value);
+    if (convRes.status === "fulfilled" && convRes.value) setConversionData(convRes.value);
+    if (trendsRes.status === "fulfilled" && trendsRes.value) setTrendsData(trendsRes.value);
     setLastUpdated(new Date());
   }, [callDays]);
 
@@ -323,15 +338,20 @@ export default function Dashboard() {
     setRefreshing(true);
     try {
       await fetch("/api/refresh", { method: "POST" });
-      // Poll until the background refresh completes, then re-fetch dashboard data
+      // Poll until the background refresh completes, then re-fetch dashboard
+      // data. Cap the wait so a hung HubSpot fetch can't pin the spinner
+      // forever — we re-fetch cached data after the cap and clear refreshing.
+      const POLL_INTERVAL_MS = 2000;
+      const MAX_POLL_MS = 5 * 60 * 1000; // 5 minutes
+      const startedAt = Date.now();
       const poll = async () => {
         try {
           const res = await fetch("/api/cache-status");
           if (res.ok) {
             const status = await res.json();
             setCacheStatus(status);
-            if (status.isRefreshing) {
-              setTimeout(poll, 2000);
+            if (status.isRefreshing && Date.now() - startedAt < MAX_POLL_MS) {
+              setTimeout(poll, POLL_INTERVAL_MS);
               return;
             }
           }
@@ -340,7 +360,7 @@ export default function Dashboard() {
         await fetchCacheStatus();
         setRefreshing(false);
       };
-      setTimeout(poll, 2000);
+      setTimeout(poll, POLL_INTERVAL_MS);
     } catch {
       setRefreshing(false);
     }

@@ -97,7 +97,7 @@ A lead is "responded" when a meaningful engagement (`isMeaningfulResponse` in `l
 - Logged CALL, outbound CALL with Connected/Voicemail disposition, or inbound Connected CALL
 - Walk-in leads only: a NOTE with non-empty body
 
-The engagement timestamp must be within a 30-minute grace window before `createDate` or later. This excludes legacy engagements on returning contacts (which would otherwise misclassify new leads as already-responded) while allowing for the call-then-create-contact workflow where reps log a call seconds-to-minutes before creating the contact record.
+The engagement timestamp must be within a 30-minute grace window before the lead start (or later). The "lead start" is the latest of `createdate` and `recent_conversion_date` — for returning contacts that re-engage via a new form fill, we anchor on the new conversion so engagements from their prior inquiry don't get counted as a response to the new one. The 30-minute grace window covers the call-then-create-contact workflow where reps log a call seconds-to-minutes before creating the contact record.
 
 ## Environment Secrets Required
 
