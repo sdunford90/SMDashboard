@@ -1,4 +1,89 @@
-import { getAllLeadsData, formatSpeedToLead } from "../../lib/leads";
+import { getAllLeadsData, formatSpeedToLead, calcBusinessMinutes, getMarinaTimezone } from "../../lib/leads";
+
+// Recompute speed-to-lead at the API layer when the cached lead pre-dates
+// the "anchor at most-recent form fill" fix. For Web Form / Digital leads
+// whose recentFormDate is more recent than createDate (returning customer
+// re-engagement), find the first meaningful response at or after that
+// anchor and recompute STL. This avoids a stale 8000-hour STL number on
+// returning-customer leads while waiting for the next refresh.
+function isMeaningful(e) {
+  if (!e) return false;
+  if (e.type === "MEETING") return true;
+  if (e.type === "EMAIL") {
+    const dir = e.direction;
+    if (dir !== "OUTGOING" && dir !== "OUTBOUND" && dir !== "FORWARDED_EMAIL" && dir !== "EMAIL") return false;
+    if (e.emailType === "AUTOMATED") return false;
+    return true;
+  }
+  if (e.type === "CALL") {
+    if (e.isLogged) return true;
+    if (e.direction === "OUTBOUND") {
+      return e.disposition === "Connected" || e.disposition === "Left Voicemail";
+    }
+    if (e.direction === "INBOUND") {
+      return e.disposition === "Connected";
+    }
+  }
+  return false;
+}
+function deriveSpeedToLead(lead) {
+  const repInitiated = lead.leadSource === "Call" || lead.leadSource === "Walk-in" || lead.leadSource === "Referral";
+  if (repInitiated) return null; // use cached values
+  if (!lead.recentFormDate || !lead.createDate) return null;
+  const anchor = new Date(lead.recentFormDate);
+  const created = new Date(lead.createDate);
+  if (!(anchor.getTime() > created.getTime())) return null; // not a returning lead
+  const engs = lead.engagements || [];
+  const GRACE_MS = 30 * 60 * 1000;
+  const earliest = anchor.getTime() - GRACE_MS;
+  const fr = engs.find((e) => {
+    if (!e.timestamp) return false;
+    if (new Date(e.timestamp).getTime() < earliest) return false;
+    return isMeaningful(e);
+  });
+  const tz = getMarinaTimezone(lead.marina);
+  if (!fr) {
+    // No qualifying response → recompute pending elapsed clock from anchor.
+    const elapsedBiz = calcBusinessMinutes(anchor.getTime(), Date.now(), tz);
+    return {
+      responded: false,
+      firstResponseTime: null,
+      speedToLeadMinutes: null,
+      speedToLeadBizMinutes: Math.min(Math.max(elapsedBiz, 0), 7 * 8 * 60),
+      speedIsPending: true,
+      firstResponse: null,
+    };
+  }
+  const rawTs = new Date(fr.timestamp);
+  const respTs = new Date(Math.max(rawTs.getTime(), anchor.getTime()));
+  const stlMin = (respTs.getTime() - anchor.getTime()) / 60000;
+  const stlBizMin = calcBusinessMinutes(anchor.getTime(), respTs.getTime(), tz);
+  let subtype = null;
+  if (fr.type === "EMAIL") {
+    const dir = fr.direction;
+    if (dir === "INCOMING" || dir === "INBOUND" || dir === "INCOMING_EMAIL") subtype = "EMAIL_INBOUND";
+    else if (fr.loggedFrom === "CRM") subtype = "EMAIL_LOGGED";
+    else subtype = "EMAIL_SENT";
+  } else if (fr.type === "CALL") {
+    subtype = fr.direction === "INBOUND" ? "INBOUND_CALL" : "OUTBOUND_CALL";
+  } else {
+    subtype = fr.type;
+  }
+  return {
+    responded: true,
+    firstResponseTime: respTs.toISOString(),
+    speedToLeadMinutes: stlMin,
+    speedToLeadBizMinutes: stlBizMin,
+    speedIsPending: false,
+    firstResponse: {
+      type: fr.type,
+      subtype,
+      timestamp: fr.timestamp,
+      disposition: fr.disposition || null,
+      synthetic: false,
+    },
+  };
+}
 
 // Synthesize firstResponse object from cached engagements when the cached
 // lead pre-dates the firstResponse field rollout (avoids requiring a full
@@ -47,7 +132,17 @@ export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
 
-    const result = leads.map((lead) => ({
+    const result = leads.map((lead) => {
+      const stlOverride = deriveSpeedToLead(lead);
+      const responded = stlOverride ? stlOverride.responded : lead.responded;
+      const firstResponseTime = stlOverride ? stlOverride.firstResponseTime : lead.firstResponseTime;
+      const speedToLeadMinutes = stlOverride ? stlOverride.speedToLeadMinutes : lead.speedToLeadMinutes;
+      const speedToLeadBizMinutes = stlOverride ? stlOverride.speedToLeadBizMinutes : lead.speedToLeadBizMinutes;
+      const speedIsPending = stlOverride ? stlOverride.speedIsPending : !!lead.speedIsPending;
+      const firstResponse = stlOverride && stlOverride.firstResponse !== undefined
+        ? stlOverride.firstResponse
+        : deriveFirstResponse(lead);
+      return {
       contactId: lead.contactId,
       name: lead.name,
       firstName: lead.firstName,
@@ -58,13 +153,13 @@ export default async function handler(req, res) {
       createDate: lead.createDate,
       marina: lead.marina,
       ownerName: lead.ownerName,
-      responded: lead.responded,
-      firstResponseTime: lead.firstResponseTime,
-      speedToLeadMinutes: lead.speedToLeadMinutes,
-      speedToLeadFormatted: formatSpeedToLead(lead.speedToLeadMinutes),
-      speedToLeadBizMinutes: lead.speedToLeadBizMinutes,
-      speedToLeadBizFormatted: formatSpeedToLead(lead.speedToLeadBizMinutes),
-      speedIsPending: !!lead.speedIsPending,
+      responded,
+      firstResponseTime,
+      speedToLeadMinutes,
+      speedToLeadFormatted: formatSpeedToLead(speedToLeadMinutes),
+      speedToLeadBizMinutes,
+      speedToLeadBizFormatted: formatSpeedToLead(speedToLeadBizMinutes),
+      speedIsPending,
       waitingOnReply: lead.waitingOnReply,
       waitingSince: lead.waitingSince,
       hasMissedInbound: lead.hasMissedInbound,
@@ -77,7 +172,7 @@ export default async function handler(req, res) {
       callsLogged: lead.callsLogged,
       callsLoggedWithNotes: lead.callsLoggedWithNotes || 0,
       lastTouch: lead.lastTouch,
-      firstResponse: deriveFirstResponse(lead),
+      firstResponse,
       lastLeadActivityAt: lead.lastLeadActivityAt,
       hubspotUrl: lead.hubspotUrl,
       leadSource: lead.leadSource,
@@ -94,10 +189,11 @@ export default async function handler(req, res) {
         ? "Missed Call"
         : lead.waitingOnReply
         ? "Waiting on Reply"
-        : lead.responded
+        : responded
         ? "Responded"
         : "Never Responded",
-    }));
+      };
+    });
 
     res.status(200).json({ leads: result, total: result.length });
   } catch (error) {
