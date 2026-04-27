@@ -85,7 +85,19 @@ Two-level cache:
 1. **In-memory** (2h TTL) — fastest, resets on server restart
 2. **PostgreSQL** (`hubspot_cache` table, 8h TTL) — persists across restarts
 
-On startup `instrumentation.js` triggers a background warmup. Stale-while-revalidate pattern: API calls return cached data immediately while a background refresh runs. Request deduplication prevents multiple parallel HubSpot fetches.
+The dashboard reads exclusively from cache. HubSpot is only contacted when the user explicitly clicks the refresh button (POST `/api/refresh` → `forceRefresh()`). `instrumentation.js` only initializes classifier metrics on startup — no auto-warmup or scheduled refresh.
+
+Refresh is batched (BATCH_SIZE=100, ENGAGEMENT_CONCURRENCY=2, PROCESS_CONCURRENCY=4) to keep memory bounded on the 0.5 vCPU / 2 GB production VM. Per-batch progress is logged. Request deduplication via `_inFlightFetch` prevents multiple parallel HubSpot fetches.
+
+## Response Classification
+
+A lead is "responded" when a meaningful engagement (`isMeaningfulResponse` in `lib/leads.js`) is found in its engagement timeline:
+- Any logged MEETING
+- Outbound non-automated EMAIL
+- Logged CALL, outbound CALL with Connected/Voicemail disposition, or inbound Connected CALL
+- Walk-in leads only: a NOTE with non-empty body
+
+The engagement timestamp must be within a 30-minute grace window before `createDate` or later. This excludes legacy engagements on returning contacts (which would otherwise misclassify new leads as already-responded) while allowing for the call-then-create-contact workflow where reps log a call seconds-to-minutes before creating the contact record.
 
 ## Environment Secrets Required
 
