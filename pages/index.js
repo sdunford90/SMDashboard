@@ -265,9 +265,9 @@ export default function Dashboard() {
   const [dateWindow, setDateWindow] = useState("7");
   const [callDays, setCallDays] = useState(30);
   const [callsMarinaFilter, setCallsMarinaFilter] = useState("all");
-  const [leadsDateWindow, setLeadsDateWindow] = useState("apr1");
+  const [leadsDateWindow, setLeadsDateWindow] = useState("7");
   const [marinaFilter, setMarinaFilter] = useState("all");
-  const [tableSort, setTableSort] = useState({ col: "waitMinutes", dir: "desc" });
+  const [tableSort, setTableSort] = useState({ col: "createDate", dir: "desc" });
   const [tableFilter, setTableFilter] = useState({ marina: "all" });
   const [nameSearch, setNameSearch] = useState("");
   const [expandedLead, setExpandedLead] = useState(null);
@@ -439,12 +439,26 @@ export default function Dashboard() {
     ? new Date("2026-04-01T00:00:00.000Z")
     : new Date(Date.now() - parseInt(leadsDateWindow, 10) * 24 * 60 * 60 * 1000);
 
+  // "Lead In" timestamp shown in the All Leads table — for Web Form / Digital
+  // leads we prefer the most-recent form fill so returning customers surface
+  // by their re-engagement date, not their original (often years-old) createDate.
+  // Sort + date filter must use this same value so the column sort matches the
+  // displayed timestamp.
+  const getLeadInTs = (l) => {
+    const formTs = l.recentFormDate || l.firstFormDate;
+    const isWebish = l.leadSource === "Web Form" || l.leadSource === "Digital";
+    return isWebish && formTs ? formTs : l.createDate;
+  };
+
   // Sorted / filtered leads table (respects its own date window)
   // Date window is ignored when a name search is active so you can find anyone
   const nameSearchLower = nameSearch.trim().toLowerCase();
   const filteredLeads = (leads?.leads || []).filter((l) => {
     if (tableFilter.marina !== "all" && l.marina !== tableFilter.marina) return false;
-    if (!nameSearchLower && l.createDate && new Date(l.createDate) < leadsWindowStart) return false;
+    if (!nameSearchLower) {
+      const leadInTs = getLeadInTs(l);
+      if (leadInTs && new Date(leadInTs) < leadsWindowStart) return false;
+    }
     if (nameSearchLower && !(l.name || "").toLowerCase().includes(nameSearchLower)) return false;
     return true;
   });
@@ -454,7 +468,7 @@ export default function Dashboard() {
     if (col === "name") return dir * (a.name || "").localeCompare(b.name || "");
     if (col === "marina") return dir * (a.marina || "").localeCompare(b.marina || "");
     if (col === "ownerName") return dir * (a.ownerName || "").localeCompare(b.ownerName || "");
-    if (col === "createDate") return dir * (new Date(a.createDate) - new Date(b.createDate));
+    if (col === "createDate") return dir * (new Date(getLeadInTs(a)) - new Date(getLeadInTs(b)));
     if (col === "speedToLeadMinutes") {
       const av = a.speedToLeadMinutes ?? 999999;
       const bv = b.speedToLeadMinutes ?? 999999;
