@@ -72,6 +72,45 @@ function formatSpeedToLead(minutes) {
   return `${h}h ${m}m`;
 }
 
+function csvCell(v) {
+  if (v === null || v === undefined) return "";
+  let s = typeof v === "string" ? v : String(v);
+  // Strip newlines/tabs that confuse spreadsheet importers
+  s = s.replace(/\r?\n|\r|\t/g, " ");
+  // Defuse spreadsheet formula injection (Excel/Sheets treat = + - @ as formulas)
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
+  if (/[",]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function exportLeadsCsv(rows) {
+  const cols = [
+    "contactId", "name", "email", "phone", "marina", "ownerName", "leadSource",
+    "createDate", "recentFormDate", "recentFormName", "firstFormDate", "numFormFills",
+    "responded", "firstResponseTime", "speedToLeadMinutes", "speedToLeadBizMinutes",
+    "speedToLeadFormatted", "speedToLeadBizFormatted", "speedIsPending",
+    "emailsSent", "emailsLogged",
+    "callsOutbound", "callsInbound", "callsConnected", "callsLogged", "callsLoggedWithNotes",
+    "lastTouch", "lastLeadActivityAt", "leadStatus", "status",
+    "isCustomer", "convertedAt", "daysToConvert",
+    "waitingOnReply", "waitingSince", "hasMissedInbound", "missedCallTime",
+    "hubspotUrl",
+  ];
+  const header = cols.join(",");
+  const body = rows.map((r) => cols.map((c) => csvCell(r[c])).join(",")).join("\n");
+  const csv = `${header}\n${body}\n`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `southern-marinas-leads-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function speedToLeadColor(minutes) {
   if (minutes === null || minutes === undefined) return "text-red-600";
   if (minutes < 60) return "text-green-600";
@@ -1446,6 +1485,14 @@ export default function Dashboard() {
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
+                  <button
+                    onClick={() => exportLeadsCsv(sortedLeads)}
+                    disabled={!sortedLeads.length}
+                    className="px-2.5 py-1.5 rounded text-xs font-medium border border-navy bg-white text-navy hover:bg-navy hover:text-white transition-colors disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-navy"
+                    title="Download the currently filtered leads as CSV"
+                  >
+                    ⬇ Export CSV
+                  </button>
                   <span className="text-xs text-gray-400">{filteredLeads.length} leads</span>
                 </div>
                 {!leads?.leads ? (
