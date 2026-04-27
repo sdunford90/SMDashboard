@@ -1,0 +1,105 @@
+2026-04-24T18:52:28Z info: Deployment: 76f63524-8732-4084-b0e7-dedad6ad43ac
+2026-04-24T18:52:28Z info: Build: 29b62177-77aa-4491-8607-a2c0adf315c5
+2026-04-24T18:52:29Z info: Running Security Scan
+2026-04-24T18:52:39Z info: Security Scan Complete
+2026-04-24T18:52:41Z info: Installing packages
+--> npm install
+
+
+up to date, audited 179 packages in 2s
+
+
+26 packages are looking for funding
+  run `npm fund` for details
+
+
+2 vulnerabilities (1 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.13.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.13.0
+npm notice To update run: npm install -g npm@11.13.0
+npm notice
+
+2026-04-24T18:52:44Z info: Starting Build
+
+> smdashboard@0.1.0 build
+> next build
+
+
+  ▲ Next.js 14.2.35
+
+  - Experiments (use with caution):
+    · instrumentationHook
+
+   Linting and checking validity of types ...
+
+   Creating an optimized production build ...
+
+ ✓ Compiled successfully
+
+   Collecting page data ...
+
+   Generating static pages (0/5) ...
+
+   Generating static pages (1/5) 
+
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+
+ ✓ Generating static pages (5/5)
+
+   Finalizing page optimization ...
+
+   Collecting build traces ...
+
+Route (pages)                             Size     First Load JS
+┌ ○ /                                     17.2 kB         102 kB
+├   /_app                                 0 B            80.9 kB
+├ ○ /404                                  181 B          81.1 kB
+├ ƒ /api/action-queue                     0 B            80.9 kB
+├ ƒ /api/activity-feed                    0 B            80.9 kB
+├ ƒ /api/auth                             0 B            80.9 kB
+├ ƒ /api/cache-status                     0 B            80.9 kB
+├ ƒ /api/cache/clear                      0 B            80.9 kB
+├ ƒ /api/calls                            0 B            80.9 kB
+├ ƒ /api/classifier-metrics               0 B            80.9 kB
+├ ƒ /api/conversions                      0 B            80.9 kB
+├ ƒ /api/lead-detail/[id]                 0 B            80.9 kB
+├ ƒ /api/lead-summary/[id]                0 B            80.9 kB
+├ ƒ /api/leads                            0 B            80.9 kB
+├ ƒ /api/presentation                     0 B            80.9 kB
+├ ƒ /api/refresh                          0 B            80.9 kB
+├ ƒ /api/speed-to-lead                    0 B            80.9 kB
+├ ƒ /api/trends                           0 B            80.9 kB
+├ ○ /login                                1.13 kB        82.1 kB
+└ ○ /presentation                         5.88 kB        90.6 kB
++ First Load JS shared by all             86.7 kB
+  ├ chunks/framework-64ad27b21261a9ce.js  44.9 kB
+  ├ chunks/main-2ea9df2978951594.js       34 kB
+  └ other shared chunks (total)           7.76 kB
+
+ƒ Middleware                              26.7 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+2026-04-24T18:53:29Z info: Pushing pid1 binary layer...
+2026-04-24T18:53:29Z info: Pushing Repl layer...
+2026-04-24T18:53:29Z info: Pushing hosting layer...
+2026-04-24T18:53:30Z info: Created hosting layer
+2026-04-24T18:53:31Z info: Created pid1 binary layer
+2026-04-24T18:54:01Z info: Created Repl layer
+2026-04-24T18:54:04Z info: Pushed image manifest
+2026-04-24T18:54:06Z info: Pushed soci index manifest
+2026-04-24T18:54:11Z info: Creating virtual machine
+2026-04-24T18:54:24Z info: Virtual machine created
+2026-04-24T18:54:25Z info: Waiting for deployment to be ready
+2026-04-24T18:55:15Z info: Deployment successful
