@@ -97,7 +97,12 @@ A lead is "responded" when a meaningful engagement (`isMeaningfulResponse` in `l
 - Logged CALL, outbound CALL with Connected/Voicemail disposition, or inbound Connected CALL
 - Walk-in leads only: a NOTE with non-empty body
 
-The engagement timestamp must be within a 30-minute grace window before `createDate` or later. This excludes legacy engagements on returning contacts (which would otherwise misclassify new leads as already-responded) while allowing for the call-then-create-contact workflow where reps log a call seconds-to-minutes before creating the contact record.
+Whether a lead counts as responded depends on the lead source:
+
+- **Call / Walk-in / Referral** — always responded. The contact only exists in HubSpot because a rep already had an inbound interaction (took a phone call, spoke to a walk-in, or received a referral handoff). The interaction itself IS the response, even if the rep logs the engagement before creating the contact record. The unresponded queues only ever contain Web Form / Digital leads.
+- **Web Form / Digital** — responded only when there's a real outbound rep touch (logged call, outbound email, meeting, or walk-in note) timestamped at or after `createDate` (with a 30-minute grace window for clock skew). Returning customers' legacy engagements (months/years old) are excluded so they don't misclassify a fresh form-fill as already responded.
+
+For Call / Walk-in / Referral leads the speed-to-lead value is clamped at 0 (response time can never be negative — the rep can't respond before the lead exists in the system).
 
 ## Environment Secrets Required
 
