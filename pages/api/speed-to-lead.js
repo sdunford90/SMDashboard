@@ -1,16 +1,18 @@
-import { getAllLeadsData } from "../../lib/leads";
+import { getAllLeadsData, isSpeedToLeadEligible } from "../../lib/leads";
 
 export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
 
-    // Per-marina average speed to lead (business hours)
+    // Per-marina average speed to lead (business hours).
+    // Only counts Web Form / Digital leads that have actually responded
+    // (see isSpeedToLeadEligible) — rep-initiated sources and pending
+    // unresponded leads would distort the answered-speed metric.
     const marinaMap = {};
     for (const lead of leads) {
       if (!lead.marina || lead.marina === "Unknown") continue;
-      if (lead.leadSource === "Walk-in") continue; // walk-ins excluded from speed metric
       if (!marinaMap[lead.marina]) marinaMap[lead.marina] = { sum: 0, count: 0 };
-      if (lead.speedToLeadBizMinutes !== null && lead.speedToLeadBizMinutes !== undefined) {
+      if (isSpeedToLeadEligible(lead)) {
         marinaMap[lead.marina].sum += lead.speedToLeadBizMinutes;
         marinaMap[lead.marina].count += 1;
       }

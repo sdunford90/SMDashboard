@@ -433,9 +433,16 @@ export default function Dashboard() {
   const sourceDigitalCount = summaryLeads.filter((l) => !["Call","Walk-in","Web Form"].includes(l.leadSource)).length;
   const respondedCount = summaryLeads.filter((l) => l.responded).length;
   const respondedPct = totalLeads > 0 ? Math.round((respondedCount / totalLeads) * 100) : 0;
-  // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
+  // STL average only counts responded Web Form / Digital leads (mirrors
+  // isSpeedToLeadEligible in lib/leads.js). Rep-initiated sources are
+  // trivially 0 and pending leads haven't actually responded yet.
   const avgSpeedLeads = summaryLeads.filter(
-    (l) => l.leadSource !== "Walk-in" && l.speedToLeadBizMinutes !== null
+    (l) =>
+      (l.leadSource === "Web Form" || l.leadSource === "Digital") &&
+      l.responded &&
+      !l.speedIsPending &&
+      l.speedToLeadBizMinutes !== null &&
+      l.speedToLeadBizMinutes !== undefined
   );
   const avgSpeed =
     avgSpeedLeads.length > 0
@@ -1337,7 +1344,7 @@ export default function Dashboard() {
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-navy">Avg Speed to Lead by Property</h2>
                 <p className="text-xs text-gray-400 mt-0.5">Business hours (9am–5pm, 7 days/week, marina timezone) · fastest to slowest · window: {dateWindow === "all" ? "All 2026" : `Last ${dateWindow} days`}</p>
-                <p className="text-[11px] text-gray-400 italic mt-0.5">Non-responded leads count their elapsed business hours (capped at 7 days). Walk-ins are excluded.</p>
+                <p className="text-[11px] text-gray-400 italic mt-0.5">Counts only Web Form / Digital leads that have actually responded. Rep-initiated sources (Call, Walk-in, Referral) and pending unresponded leads are excluded so they don't distort the answered-speed average.</p>
               </div>
               {!leads?.leads ? (
                 <LoadingSkeleton height="h-64" />
@@ -1346,12 +1353,19 @@ export default function Dashboard() {
                 for (const l of dateFilteredLeads) {
                   if (!l.marina || l.marina === "Unknown") continue;
                   if (!map[l.marina]) map[l.marina] = { sum: 0, count: 0, total: 0, respondedCount: 0 };
-                  // Walk-ins still count toward total/responded denominators,
-                  // but are excluded from the speed sum/count (see lib/leads.js).
+                  // All sources count toward total / responded denominators,
+                  // but only responded Web Form / Digital leads contribute to
+                  // the speed average (rep-initiated leads are trivially 0;
+                  // pending unresponded leads haven't actually responded yet).
                   map[l.marina].total += 1;
                   if (l.responded) map[l.marina].respondedCount += 1;
-                  if (l.leadSource === "Walk-in") continue;
-                  if (l.speedToLeadBizMinutes === null || l.speedToLeadBizMinutes === undefined) continue;
+                  const speedEligible =
+                    (l.leadSource === "Web Form" || l.leadSource === "Digital") &&
+                    l.responded &&
+                    !l.speedIsPending &&
+                    l.speedToLeadBizMinutes !== null &&
+                    l.speedToLeadBizMinutes !== undefined;
+                  if (!speedEligible) continue;
                   map[l.marina].sum += l.speedToLeadBizMinutes;
                   map[l.marina].count += 1;
                 }

@@ -1,4 +1,4 @@
-import { getAllLeadsData, formatSpeedToLead } from "../../lib/leads";
+import { getAllLeadsData, formatSpeedToLead, isSpeedToLeadEligible } from "../../lib/leads";
 
 export default async function handler(req, res) {
   try {
@@ -35,10 +35,10 @@ export default async function handler(req, res) {
     const speedByProperty = marinas
       .map((marina) => {
         const ml = leads7Days.filter((l) => l.marina === marina);
-        // Walk-ins are excluded from the speed-to-lead metric — see lib/leads.js.
-        const speedEligible = ml.filter((l) => l.leadSource !== "Walk-in");
         const responded = ml.filter((l) => l.responded);
-        const withBiz = speedEligible.filter((l) => l.speedToLeadBizMinutes !== null);
+        // Only responded Web Form / Digital leads count toward the average
+        // (see isSpeedToLeadEligible in lib/leads.js).
+        const withBiz = ml.filter((l) => isSpeedToLeadEligible(l));
         const avg =
           withBiz.length > 0
             ? withBiz.reduce((s, l) => s + l.speedToLeadBizMinutes, 0) / withBiz.length

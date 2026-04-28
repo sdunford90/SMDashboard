@@ -1,4 +1,4 @@
-import { getAllLeadsData } from "../../lib/leads";
+import { getAllLeadsData, isSpeedToLeadEligible } from "../../lib/leads";
 
 const CUTOFF = new Date("2026-04-01T00:00:00.000Z");
 
@@ -63,21 +63,16 @@ export default async function handler(req, res) {
       if (lead.isCustomer) buckets[key].byMarina[marina].converted += 1;
       if (lead.responded) buckets[key].byMarina[marina].responded += 1;
 
-      // Walk-ins still count toward total / responded but are excluded
-      // from the speed-to-lead metric (see lib/leads.js).
-      const eligibleForSpeed = lead.leadSource !== "Walk-in";
-      if (eligibleForSpeed) {
+      // Speed-to-lead metric only includes responded Web Form / Digital
+      // leads (see isSpeedToLeadEligible in lib/leads.js). Rep-initiated
+      // sources and pending unresponded leads would distort the metric.
+      if (isSpeedToLeadEligible(lead)) {
         buckets[key].overall.speedEligible += 1;
         buckets[key].byMarina[marina].speedEligible += 1;
-        if (
-          lead.speedToLeadBizMinutes !== null &&
-          lead.speedToLeadBizMinutes !== undefined
-        ) {
-          buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
-          buckets[key].overall.speedCount += 1;
-          buckets[key].byMarina[marina].speedSum += lead.speedToLeadBizMinutes;
-          buckets[key].byMarina[marina].speedCount += 1;
-        }
+        buckets[key].overall.speedSum += lead.speedToLeadBizMinutes;
+        buckets[key].overall.speedCount += 1;
+        buckets[key].byMarina[marina].speedSum += lead.speedToLeadBizMinutes;
+        buckets[key].byMarina[marina].speedCount += 1;
       }
     }
 

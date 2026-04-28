@@ -106,6 +106,16 @@ For Call / Walk-in / Referral leads the speed-to-lead value is clamped at 0 (res
 
 `pages/api/leads.js` recomputes `responded`, `firstResponseTime`, `speedToLead*`, and `firstResponse` at request time using the same STL-anchor logic, so the fix shows immediately on cached leads without waiting for a full ~6-minute HubSpot refresh. The recompute reuses `calcBusinessMinutes` / `getMarinaTimezone` exported from `lib/leads.js` and a local `isMeaningful` predicate that mirrors `isMeaningfulResponse` (accepts logged emails — direction `EMAIL` — and rejects automated emails).
 
+### Speed-to-Lead Average Eligibility
+
+Marina / property / monthly speed-to-lead averages (`/api/speed-to-lead`, `/api/trends`, `/api/presentation`, and the in-page Property scorecard) only count leads that have actually responded with a measurable response gap. The shared helper `isSpeedToLeadEligible(lead)` exported from `lib/leads.js` requires:
+
+- `leadSource === "Web Form"` or `"Digital"` — rep-initiated sources (Call / Walk-in / Referral) are excluded because their STL is trivially 0 (the rep already had the inbound interaction before the contact existed) and would pollute the average toward 0.
+- `responded === true` and `speedIsPending === false` — pending unresponded leads have an elapsed-clock placeholder used by the action queue / pending display, but they haven't actually responded yet, so they're excluded from the answered-speed metric.
+- `speedToLeadBizMinutes` is non-null.
+
+The dashboard's "Responded" / total counts still include every lead so response-rate denominators are accurate; only the speed average is restricted.
+
 ## Environment Secrets Required
 
 - `HUBSPOT_API_TOKEN` — HubSpot private app access token
