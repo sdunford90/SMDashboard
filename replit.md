@@ -89,6 +89,8 @@ The dashboard reads exclusively from cache. HubSpot is only contacted when the u
 
 Refresh is batched (BATCH_SIZE=100, ENGAGEMENT_CONCURRENCY=2, PROCESS_CONCURRENCY=4) to keep memory bounded on the 0.5 vCPU / 2 GB production VM. Per-batch progress is logged. Request deduplication via `_inFlightFetch` prevents multiple parallel HubSpot fetches.
 
+DB cache reads (`getDbCache` / `getDbCacheWithStale` in `lib/db.js`) carry their own safeguards because the `hubspot_cache` row is a multi-megabyte JSONB blob that takes 10-20s to pull on a cold container: (1) a 25s JS-side timeout, (2) `client.release(err)` on timeout so a half-broken client is destroyed instead of poisoning the pool, (3) per-key in-flight dedup so a single dashboard page-load (5+ parallel API calls) only triggers one SELECT against the row. When the read genuinely fails the caller falls through to an empty `{leads:[], byMarina:{}}` so the dashboard renders instead of spinning forever.
+
 ## Response Classification
 
 A lead is "responded" when a meaningful engagement (`isMeaningfulResponse` in `lib/leads.js`) is found in its engagement timeline:

@@ -1,0 +1,89 @@
+2026-04-30 10:28:41.86
+0c639875
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-04-30 10:28:41.86
+0c639875
+System
+forwarding local port 3000 to external port 80 (mapped as 1104)
+2026-04-30 10:28:51.52
+0c639875
+User
+> next start -p ${PORT:-5000} -H 0.0.0.0
+2026-04-30 10:28:51.52
+0c639875
+User
+> smdashboard@0.1.0 start
+2026-04-30 10:28:57.04
+0c639875
+User
+▲ Next.js 14.2.35
+2026-04-30 10:28:57.04
+0c639875
+User
+- Network: http://0.0.0.0:3000
+2026-04-30 10:28:57.04
+0c639875
+User
+✓ Starting...
+2026-04-30 10:28:57.04
+0c639875
+User
+- Local: http://localhost:3000
+2026-04-30 10:28:58.81
+0c639875
+User
+✓ Ready in 4.4s
+2026-04-30 10:28:58.96
+0c639875
+User
+(node:31) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-04-30 10:28:58.96
+0c639875
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-04-30 10:28:58.96
+0c639875
+User
+To prepare for this change:
+2026-04-30 10:28:58.96
+0c639875
+User
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-04-30 10:28:58.96
+0c639875
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-04-30 10:28:58.96
+0c639875
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-04-30 10:28:58.96
+0c639875
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-04-30 10:28:59.40
+0c639875
+User
+[warmup] Classifier metrics restored from DB.
+2026-04-30 10:32:10.98
+0c639875
+User
+[db-cache] read error: db query timed out after 8000ms
+2026-04-30 10:32:11.10
+0c639875
+User
+[db-cache] read error: db query timed out after 8000ms
+2026-04-30 10:32:11.10
+0c639875
+User
+[db-cache] read error: db query timed out after 8000ms
+2026-04-30 10:32:11.10
+0c639875
+User
+[db-cache] read error: db query timed out after 8000ms
+
+2026-04-30 10:32:11.10
+0c639875
+User
+[db-cache] read error: db query timed out after 8000ms
