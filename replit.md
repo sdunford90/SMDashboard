@@ -18,7 +18,7 @@ A Next.js 14 dashboard for tracking HubSpot CRM leads across all Southern Marina
 - `lib/db.js` — PostgreSQL connection + persistent cache helpers + classifier decision store
 - `lib/ack-classifier.js` — Reply classifier; persists decisions to `classifier_decisions` so Insights stats survive restarts (90d retention, pruned every 6h)
 - `middleware.js` — Session cookie auth protecting all routes except `/login`
-- `instrumentation.js` — Warmup: pre-loads HubSpot data into cache on server start
+- `instrumentation.js` — Startup: restores classifier metrics from DB, crash handlers, heartbeat logger (HubSpot warmup disabled)
 - `pages/index.js` — Main dashboard UI (all tabs)
 - `pages/api/leads.js` — Lead list + KPI metrics API
 - `pages/api/action-queue.js` — Action queue tabs (missed calls, waiting, never responded)
@@ -98,6 +98,16 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 ### HubSpot API Optimization
 - Engagement fetching uses `batchApi.read()` (up to 100 objects per call) instead of individual `getById()` calls, reducing thousands of API calls to dozens.
 - Association IDs for all 4 engagement types (emails, calls, notes, meetings) are fetched in parallel per contact.
+- **Connection pooling**: `lib/hubspot.js` monkey-patches `node-fetch` in `require.cache` before loading `@hubspot/api-client`, injecting a shared `https.Agent` (`keepAlive:true, maxSockets:6`) into every fetch call. Also sets `https.globalAgent` and passes `httpAgent` to the SDK constructor. This prevents the SDK's internal codegen layer from creating a new TLS connection per API call (was causing ~4.5GB RSS from socket buffers; now ~830MB during refresh).
+- **Memory management**: bodyPreview trimmed to 200 chars. Batch-level memory logging every 5 batches.
+- **Production start**: `node --expose-gc --max-old-space-size=1024` to cap V8 heap.
+
+### Newsletter Form Fill Filter
+- `isNewsletterFormName(/^events & news -/i)` strips newsletter signups from form-fill signals in both `processContact` (HubSpot fetch path) and `_stripNewsletterFromCachedLead` (`_applyRecompute` cache path).
+
+### Crash Handlers & Monitoring
+- `instrumentation.js`: `uncaughtException` and `unhandledRejection` handlers log to console before exit. 10-minute heartbeat logger reports PID, uptime, RSS, heap.
+- `/api/health` — zero-dependency diagnostic endpoint (whitelisted in middleware, no auth required). Reports uptime, RSS, heap, PID.
 
 Refresh is batched (BATCH_SIZE=100, ENGAGEMENT_CONCURRENCY=2, PROCESS_CONCURRENCY=4) to keep memory bounded on the 0.5 vCPU / 2 GB production VM. Per-batch progress is logged. Request deduplication via `_inFlightFetch` prevents multiple parallel HubSpot fetches.
 
