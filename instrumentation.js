@@ -14,5 +14,24 @@ export async function register() {
       .then(() => console.log("[warmup] Classifier metrics restored from DB."))
       .catch((err) => console.error("[warmup] Classifier init failed:", err.message));
     startClassifierPruneScheduler();
+
+    process.on("uncaughtException", (err) => {
+      console.error("[FATAL] uncaughtException — process will exit:", err?.stack || err);
+      process.exit(1);
+    });
+    process.on("unhandledRejection", (reason) => {
+      console.error("[FATAL] unhandledRejection:", reason?.stack || reason);
+    });
+
+    const HEARTBEAT_MS = 10 * 60 * 1000;
+    const hb = setInterval(() => {
+      const mem = process.memoryUsage();
+      console.log(
+        `[heartbeat] pid=${process.pid} up=${Math.round(process.uptime())}s` +
+        ` rss=${Math.round(mem.rss/1024/1024)}MB` +
+        ` heap=${Math.round(mem.heapUsed/1024/1024)}/${Math.round(mem.heapTotal/1024/1024)}MB`
+      );
+    }, HEARTBEAT_MS);
+    if (hb.unref) hb.unref();
   }
 }
