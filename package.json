@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 5000 -H 0.0.0.0",
     "build": "next build",
-    "start": "node --expose-gc --max-old-space-size=1024 node_modules/.bin/next start -p ${PORT:-5000} -H 0.0.0.0",
+    "start": "MALLOC_ARENA_MAX=2 node --expose-gc --max-old-space-size=768 --max-semi-space-size=32 node_modules/.bin/next start -p ${PORT:-5000} -H 0.0.0.0",
     "lint": "next lint"
   },
   "dependencies": {
