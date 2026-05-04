@@ -9,11 +9,11 @@ export default function handler(req, res) {
   const backfill = req.query.backfill === "true" || req.body?.backfill === true;
 
   if (backfill) {
-    // Run an unbounded recheck pass over every unresponded lead with
-    // empty engagements (no time bound, large cap). Used after an
-    // upstream HubSpot association issue is fixed to mop up everything
-    // that drifted into a stale state.
-    _recheckUnrespondedEngagements({ recentDays: 0, limit: 5000 })
+    // Run a fully unbounded recheck pass over every unresponded lead
+    // with empty engagements (no time bound, no row cap). Used after
+    // an upstream HubSpot association issue is fixed to mop up
+    // everything that drifted into a stale state.
+    _recheckUnrespondedEngagements({ recentDays: 0, limit: 0 })
       .then(() => console.log("[api/refresh] Manual backfill recheck complete."))
       .catch((err) =>
         console.error("[api/refresh] Manual backfill recheck failed:", err.message)
