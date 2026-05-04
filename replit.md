@@ -52,6 +52,7 @@ A Next.js 14 dashboard for tracking HubSpot CRM leads across all Southern Marina
 
 ## Contact Exclusions
 
+- `customer_type_2 = "Spam"` — filtered at HubSpot API level (full refresh) and during processing (incremental refresh). Spam contacts are deleted from `leads` and `engagements` tables, removed from in-memory cache, and excluded from DB reads via `isSpam` flag. If a contact is marked spam after initial fetch, the next incremental refresh detects it and purges it.
 - `hs_analytics_source NEQ "OFFLINE"` — removes IMPORT and Power Automate contacts (both share the OFFLINE source value)
 - All data is from January 1, 2026 onward
 
