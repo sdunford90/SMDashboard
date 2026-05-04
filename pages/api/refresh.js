@@ -5,12 +5,12 @@ export default function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // forceRefresh() clears only the in-memory cache entry — DB cache stays
-  // intact so concurrent dashboard API calls keep getting served stale data
-  // rather than blocking for 4+ minutes while the HubSpot fetch runs.
-  forceRefresh()
-    .then(() => console.log("[api/refresh] Manual refresh complete."))
-    .catch((err) => console.error("[api/refresh] Manual refresh failed:", err.message));
+  const force = req.query.force === "true" || req.body?.force === true;
+  const mode = force ? "full" : "incremental";
 
-  res.status(200).json({ success: true, message: "Refresh started" });
+  forceRefresh({ force })
+    .then(() => console.log(`[api/refresh] Manual ${mode} refresh complete.`))
+    .catch((err) => console.error(`[api/refresh] Manual ${mode} refresh failed:`, err.message));
+
+  res.status(200).json({ success: true, message: `${mode} refresh started` });
 }

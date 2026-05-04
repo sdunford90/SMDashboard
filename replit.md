@@ -79,17 +79,29 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 
 `calcBusinessMinutes(startMs, endMs, tz)` in `lib/leads.js` handles DST-safe conversion via `Intl.DateTimeFormat`.
 
-## Caching Strategy
+## Data Storage & Caching
 
-Two-level cache:
+### Normalized DB Tables (source of truth)
+- **`leads`** — one row per contact (`contact_id` PK, `data` JSONB with all derived fields, `updated_at`). Indexed on `(data->>'marina')`.
+- **`engagements`** — one row per engagement (`engagement_id` PK, `contact_id`, `type`, `data` JSONB, `timestamp`). Indexed on `contact_id` and `timestamp`.
+- **`sync_state`** — tracks last successful refresh timestamp, contact/engagement counts.
+
+### Cache Layers
 1. **In-memory** (2h TTL) — fastest, resets on server restart
-2. **PostgreSQL** (`hubspot_cache` table, 8h TTL) — persists across restarts
+2. **PostgreSQL normalized tables** — `getAllLeadsData()` reads from `leads` + `engagements` tables, applies `_applyRecompute`, and populates in-memory cache
+3. **PostgreSQL JSON blob** (`hubspot_cache` table) — legacy fallback during transition, still written on refresh
 
-The dashboard reads exclusively from cache. HubSpot is only contacted when the user explicitly clicks the refresh button (POST `/api/refresh` → `forceRefresh()`). `instrumentation.js` only initializes classifier metrics on startup — no auto-warmup or scheduled refresh.
+### Refresh Modes
+- **Incremental (default)**: `POST /api/refresh` — uses `lastmodifieddate GTE` filter to fetch only contacts modified since last sync. Engagement IDs already in DB are skipped. Typically completes in seconds.
+- **Full**: `POST /api/refresh?force=true` — clears sync_state and re-fetches all contacts and engagements. Used for first run or recovery.
+
+### HubSpot API Optimization
+- Engagement fetching uses `batchApi.read()` (up to 100 objects per call) instead of individual `getById()` calls, reducing thousands of API calls to dozens.
+- Association IDs for all 4 engagement types (emails, calls, notes, meetings) are fetched in parallel per contact.
 
 Refresh is batched (BATCH_SIZE=100, ENGAGEMENT_CONCURRENCY=2, PROCESS_CONCURRENCY=4) to keep memory bounded on the 0.5 vCPU / 2 GB production VM. Per-batch progress is logged. Request deduplication via `_inFlightFetch` prevents multiple parallel HubSpot fetches.
 
-DB cache reads (`getDbCache` / `getDbCacheWithStale` in `lib/db.js`) carry their own safeguards because the `hubspot_cache` row is a multi-megabyte JSONB blob that takes 10-20s to pull on a cold container: (1) a 25s JS-side timeout, (2) `client.release(err)` on timeout so a half-broken client is destroyed instead of poisoning the pool, (3) per-key in-flight dedup so a single dashboard page-load (5+ parallel API calls) only triggers one SELECT against the row. When the read genuinely fails the caller falls through to an empty `{leads:[], byMarina:{}}` so the dashboard renders instead of spinning forever.
+DB cache reads carry safeguards: (1) a 25s JS-side timeout, (2) `client.release(err)` on timeout so a half-broken client is destroyed instead of poisoning the pool, (3) per-key in-flight dedup so a single dashboard page-load (5+ parallel API calls) only triggers one SELECT. When the read genuinely fails the caller falls through to an empty `{leads:[], byMarina:{}}` so the dashboard renders instead of spinning forever.
 
 ## Response Classification
 
