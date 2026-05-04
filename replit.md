@@ -84,7 +84,7 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 
 ### Normalized DB Tables (source of truth)
 - **`leads`** — one row per contact (`contact_id` PK, `data` JSONB with all derived fields, `updated_at`). Indexed on `(data->>'marina')`.
-- **`engagements`** — one row per engagement (`engagement_id` PK, `contact_id`, `type`, `data` JSONB, `timestamp`). Indexed on `contact_id` and `timestamp`.
+- **`engagements`** — one row per engagement-contact link (composite PK `(engagement_id, contact_id)`, `type`, `data` JSONB, `timestamp`). One HubSpot engagement can be associated with multiple contacts. Indexed on `contact_id` and `timestamp`.
 - **`sync_state`** — tracks last successful refresh timestamp, contact/engagement counts.
 
 ### Cache Layers
