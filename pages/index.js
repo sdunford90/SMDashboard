@@ -829,9 +829,12 @@ export default function Dashboard() {
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
                         <td className="px-4 py-3 text-sm">{timeAgo(item.createDate)}</td>
                         <td className="px-4 py-3 text-sm">
-                          <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium">
-                            Open in HubSpot
-                          </a>
+                          <div className="flex items-center gap-3 justify-end">
+                            <LeadRecheckButton contactId={item.contactId} onSuccess={fetchAll} />
+                            <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium">
+                              Open in HubSpot
+                            </a>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -888,9 +891,12 @@ export default function Dashboard() {
                             ) : "--"}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium whitespace-nowrap">
-                              Open in HubSpot
-                            </a>
+                            <div className="flex items-center gap-3 justify-end">
+                              <LeadRecheckButton contactId={item.contactId} onSuccess={fetchAll} />
+                              <a href={item.hubspotUrl} target="_blank" rel="noreferrer" className="text-gold hover:underline text-xs font-medium whitespace-nowrap">
+                                Open in HubSpot
+                              </a>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -2145,6 +2151,60 @@ function TabButton({ active, onClick, label, count, color }) {
       <span className={`ml-2 ${colors[color]} text-white text-xs font-bold px-1.5 py-0.5 rounded-full`}>
         {count}
       </span>
+    </button>
+  );
+}
+
+// Per-row "recheck" button shown on Never-Responded / All-Unresponded
+// rows (Task #25). POSTs to /api/lead-recheck/[id], which re-fetches
+// just this contact's engagements from HubSpot, persists them, and
+// patches the in-memory cache. On success we trigger a parent reload
+// (passed in via onSuccess) so the row drops out of the unresponded
+// queue if HubSpot now shows it as responded.
+function LeadRecheckButton({ contactId, onSuccess }) {
+  const [state, setState] = useState("idle"); // idle | running | done | error
+  const [msg, setMsg] = useState(null);
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (state === "running") return;
+    setState("running");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/lead-recheck/${encodeURIComponent(contactId)}`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setState("done");
+      const found = typeof body.found === "number" ? body.found : 0;
+      setMsg(found > 0 ? `Found ${found}` : "No new");
+      if (onSuccess) onSuccess();
+      setTimeout(() => { setState("idle"); setMsg(null); }, 3000);
+    } catch (err) {
+      setState("error");
+      setMsg(err.message || "Error");
+      setTimeout(() => { setState("idle"); setMsg(null); }, 4000);
+    }
+  };
+  const label =
+    state === "running" ? "Checking..." :
+    state === "done"    ? `↻ ${msg}` :
+    state === "error"   ? `✗ ${msg}` :
+    "↻ Recheck";
+  const cls =
+    state === "running" ? "text-gray-400 cursor-wait" :
+    state === "done"    ? "text-emerald-600" :
+    state === "error"   ? "text-red-600" :
+    "text-blue-600 hover:underline";
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={state === "running"}
+      className={`text-xs font-medium whitespace-nowrap ${cls}`}
+      title="Re-fetch engagements for this lead from HubSpot"
+    >
+      {label}
     </button>
   );
 }

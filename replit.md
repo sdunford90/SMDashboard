@@ -85,7 +85,7 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 ### Normalized DB Tables (source of truth)
 - **`leads`** — one row per contact (`contact_id` PK, `data` JSONB with all derived fields, `updated_at`). Indexed on `(data->>'marina')`.
 - **`engagements`** — one row per engagement-contact link (composite PK `(engagement_id, contact_id)`, `type`, `data` JSONB, `timestamp`). One HubSpot engagement can be associated with multiple contacts. Indexed on `contact_id` and `timestamp`.
-- **`sync_state`** — tracks last successful refresh timestamp, contact/engagement counts.
+- **`sync_state`** — tracks last successful refresh timestamp, contact/engagement counts. Includes `last_engagement_sync_at` (Task #25) — independent watermark for the engagement-modified search so contact-side and engagement-side refreshes can advance separately.
 
 ### Cache Layers
 1. **In-memory** (2h TTL) — fastest, resets on server restart
@@ -93,11 +93,22 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 3. **PostgreSQL JSON blob** (`hubspot_cache` table) — legacy fallback during transition, still written on refresh
 
 ### Refresh Modes
-- **Incremental (default)**: `POST /api/refresh` — uses `lastmodifieddate GTE` filter to fetch only contacts modified since last sync. Engagement IDs already in DB are skipped. Typically completes in seconds.
+- **Incremental (default)**: `POST /api/refresh` — runs in two stages:
+  1. **Bulk engagement watermark** (Task #25) — searches `emails`, `calls`, `notes`, `meetings` directly with `hs_lastmodifieddate >= last_engagement_sync_at` and uses v4 batch associations to map each engagement to its contacts. This is a small constant number of API calls regardless of how many contacts changed. Catches engagements whose contact-association lands AFTER the parent contact's `lastmodifieddate` updates (the failure mode the per-cycle recheck used to mop up).
+  2. **Modified contacts** — `lastmodifieddate GTE` filter fetches contacts modified since last sync. For contacts already in the DB, the per-contact engagement walk is **skipped** (the bulk watermark above already populated them); only brand-new contacts get the full 4-list walk. Engagement IDs already in DB are skipped on the brand-new path too.
+  After both stages, JSONB engagement arrays are patched on contacts whose engagements changed via the bulk watermark but whose contact record itself was not in the modified-contacts set.
 - **Full**: `POST /api/refresh?force=true` — clears sync_state and re-fetches all contacts and engagements. Used for first run or recovery.
+- **Backfill recheck**: `POST /api/refresh?backfill=true` — runs `_recheckUnrespondedEngagements` with no time bound and a high cap (5000) to mop up everything that drifted into the responded=false / 0-engagements state. Used after upstream HubSpot association issues are resolved.
 
 ### Engagement Recheck (`_recheckUnrespondedEngagements`)
-Each incremental refresh re-checks up to 50 unresponded leads that have 0 engagements in the DB JSONB. For each, it re-fetches engagement associations from HubSpot. This catches HubSpot association propagation delays (contact `lastmodifieddate` updates immediately when a rep sends an email, but the email-to-contact association can take seconds to propagate — the incremental refresh may catch the contact in that window with 0 associations). Writes use a per-contact DB transaction (engagements table + leads JSONB updated atomically). After updates, patched leads are also applied to the in-memory cache with `recomputeSpeedToLead` so the dashboard reflects changes immediately without waiting for a full cache rebuild.
+Demoted to a periodic safety net as of Task #25 — runs once every 5 incremental refresh cycles, scoped to leads created in the last 7 days, with a per-call cap of 100 rows. The bulk engagement watermark above now covers the common case of HubSpot association propagation delays. Writes use a per-contact DB transaction (engagements table + leads JSONB updated atomically). After updates, patched leads are applied to the in-memory cache with `recomputeSpeedToLead` so the dashboard reflects changes immediately without waiting for a full cache rebuild.
+
+### Per-Lead Manual Recheck
+- `POST /api/lead-recheck/[id]` — re-fetches one contact's engagements directly from HubSpot, persists them, patches the JSONB engagements field, and refreshes the in-memory cache.
+- Surfaced in the UI as a "↻ Recheck" button on every row of the **Never Responded** and **All Unresponded** action-queue tabs.
+
+### Drift Metric
+- `GET /api/cache-status` exposes `drift.unrespondedEmptyLast7d` — count of leads created in the last 7 days that are still `responded=false` with empty engagements. A non-zero count signals a regression in the sync pipeline.
 
 ### HubSpot API Optimization
 - Engagement fetching uses `batchApi.read()` (up to 100 objects per call) instead of individual `getById()` calls, reducing thousands of API calls to dozens.
