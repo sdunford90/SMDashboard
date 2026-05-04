@@ -1,5 +1,31 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    const https = require("https");
+    const agent = new https.Agent({
+      keepAlive: true,
+      maxSockets: 6,
+      maxFreeSockets: 4,
+    });
+    https.globalAgent = agent;
+
+    const originalFetch = require("node-fetch");
+    const patchedFetch = function (url, opts = {}) {
+      if (!opts.agent) {
+        opts = { ...opts, agent };
+      }
+      return originalFetch(url, opts);
+    };
+    patchedFetch.default = patchedFetch;
+    for (const key of Object.keys(originalFetch)) {
+      if (!(key in patchedFetch)) patchedFetch[key] = originalFetch[key];
+    }
+    const resolvedPath = require.resolve("node-fetch");
+    require.cache[resolvedPath] = {
+      id: resolvedPath,
+      filename: resolvedPath,
+      loaded: true,
+      exports: patchedFetch,
+    };
     // Auto-warmup and the 2-hour scheduled HubSpot refresh have been disabled.
     // The dashboard now serves whatever is in the persistent DB cache, and the
     // user manually triggers a fresh HubSpot pull via the refresh button
