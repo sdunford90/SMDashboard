@@ -96,6 +96,9 @@ Calculated as 9am–5pm **7 days a week** in the marina's local timezone:
 - **Incremental (default)**: `POST /api/refresh` — uses `lastmodifieddate GTE` filter to fetch only contacts modified since last sync. Engagement IDs already in DB are skipped. Typically completes in seconds.
 - **Full**: `POST /api/refresh?force=true` — clears sync_state and re-fetches all contacts and engagements. Used for first run or recovery.
 
+### Engagement Recheck (`_recheckUnrespondedEngagements`)
+Each incremental refresh re-checks up to 50 unresponded leads that have 0 engagements in the DB JSONB. For each, it re-fetches engagement associations from HubSpot. This catches HubSpot association propagation delays (contact `lastmodifieddate` updates immediately when a rep sends an email, but the email-to-contact association can take seconds to propagate — the incremental refresh may catch the contact in that window with 0 associations). Writes use a per-contact DB transaction (engagements table + leads JSONB updated atomically). After updates, patched leads are also applied to the in-memory cache with `recomputeSpeedToLead` so the dashboard reflects changes immediately without waiting for a full cache rebuild.
+
 ### HubSpot API Optimization
 - Engagement fetching uses `batchApi.read()` (up to 100 objects per call) instead of individual `getById()` calls, reducing thousands of API calls to dozens.
 - Association IDs for all 4 engagement types (emails, calls, notes, meetings) are fetched in parallel per contact.

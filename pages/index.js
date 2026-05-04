@@ -358,6 +358,18 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchCacheStatus]);
 
+  // Re-fetch data when user returns to the tab
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchAll();
+        fetchCacheStatus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetchAll, fetchCacheStatus]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
