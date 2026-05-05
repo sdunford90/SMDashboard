@@ -91,7 +91,7 @@ function exportLeadsCsv(rows) {
     "speedToLeadFormatted", "speedToLeadBizFormatted", "speedIsPending",
     "emailsSent", "emailsLogged",
     "callsOutbound", "callsInbound", "callsConnected", "callsLogged", "callsLoggedWithNotes",
-    "lastTouch", "lastLeadActivityAt", "leadStatus", "status",
+    "lastTouch", "lastLeadActivityAt", "leadStatus", "status", "leadTemp",
     "isCustomer", "convertedAt", "daysToConvert",
     "waitingOnReply", "waitingSince", "hasMissedInbound", "missedCallTime",
     "hubspotUrl",
@@ -109,6 +109,22 @@ function exportLeadsCsv(rows) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function LeadTempBadge({ value }) {
+  if (!value) return <span className="text-gray-300 text-xs">—</span>;
+  const v = String(value).trim();
+  const k = v.toLowerCase();
+  let cls = "bg-gray-100 text-gray-700";
+  let icon = "";
+  if (k === "hot") { cls = "bg-red-100 text-red-700"; icon = "🔥"; }
+  else if (k === "warm") { cls = "bg-amber-100 text-amber-800"; icon = "🌤"; }
+  else if (k === "cold") { cls = "bg-sky-100 text-sky-700"; icon = "❄️"; }
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${cls}`}>
+      {icon && <span>{icon}</span>}{v}
+    </span>
+  );
 }
 
 function speedToLeadColor(minutes) {
@@ -1554,6 +1570,7 @@ export default function Dashboard() {
                           ))}
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Type</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Status</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Lead Temp</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Last Touch</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Emails</th>
                           <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Calls</th>
@@ -1656,6 +1673,9 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </td>
+                            <td className="px-4 py-3">
+                              <LeadTempBadge value={lead.leadTemp} />
+                            </td>
                             <td className="px-4 py-3 text-xs text-gray-500">
                               {lead.lastTouch
                                 ? `${lead.lastTouch.subtype?.replace(/_/g, " ").toLowerCase()} ${timeAgo(lead.lastTouch.timestamp)}`
@@ -1703,7 +1723,7 @@ export default function Dashboard() {
                           </tr>
                           {expandedLead === lead.contactId && (
                             <tr key={`${lead.contactId}-detail`}>
-                              <td colSpan={10} className="bg-gray-50 px-0 py-0">
+                              <td colSpan={11} className="bg-gray-50 px-0 py-0">
                                 <LeadDetailPanel detail={leadDetail} loading={loadingDetail} />
                               </td>
                             </tr>
@@ -1712,7 +1732,7 @@ export default function Dashboard() {
                         ))}
                         {sortedLeads.length === 0 && (
                           <tr>
-                            <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <td colSpan={11} className="px-4 py-8 text-center text-gray-400 text-sm">
                               No leads found
                             </td>
                           </tr>
