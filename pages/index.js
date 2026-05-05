@@ -295,6 +295,8 @@ export default function Dashboard() {
   const [callData, setCallData] = useState(null);
   const [conversionData, setConversionData] = useState(null);
   const [trendsData, setTrendsData] = useState(null);
+  const [selectedMarinas, setSelectedMarinas] = useState(() => new Set());
+  const [leaderboardSort, setLeaderboardSort] = useState({ key: "speed", dir: "asc" });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [cacheStatus, setCacheStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1982,143 +1984,376 @@ export default function Dashboard() {
           </>)}
 
           {/* ── TRENDS TAB ──────────────────────────────── */}
-          {pageTab === "trends" && (<>
-
-            {/* Speed to Lead Over Time */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-navy">Speed to Lead Over Time</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Average business-minute response time per calendar month · April 2026 onward</p>
-              </div>
-              {!trendsData?.months ? (
-                <LoadingSkeleton height="h-72" />
-              ) : trendsData.months.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
-              ) : (() => {
-                const chartData = trendsData.months.map((m) => {
-                  const row = { month: m.label, _resp: {} };
-                  if (m.overall.avgSpeedBizMinutes !== null) {
-                    row["Overall"] = m.overall.avgSpeedBizMinutes;
-                    row._resp["Overall"] = m.overall.respondedPct;
-                  }
-                  for (const marina of trendsData.marinas) {
-                    const bm = m.byMarina[marina];
-                    const v = bm?.avgSpeedBizMinutes;
-                    if (v !== null && v !== undefined) {
-                      row[marina] = v;
-                      row._resp[marina] = bm?.respondedPct ?? null;
-                    }
-                  }
-                  return row;
-                });
-                const keys = ["Overall", ...trendsData.marinas];
-                const colors = ["#64748b", ...MARINA_COLORS];
-                return (
-                  <>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={chartData} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatSpeedToLead(v)} width={64} />
-                        <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (!active || !payload || !payload.length) return null;
-                            return (
-                              <div className="bg-white border rounded shadow-sm px-3 py-2 text-xs">
-                                <div className="font-semibold text-navy mb-1">{label}</div>
-                                {payload.map((p) => {
-                                  const pct = p.payload?._resp?.[p.name];
-                                  return (
-                                    <div key={p.name} className="flex items-center gap-2">
-                                      <span className="inline-block w-2 h-2 rounded-sm" style={{ background: p.color }} />
-                                      <span className="text-gray-700">{p.name}:</span>
-                                      <span className="font-semibold">{formatSpeedToLead(p.value)}</span>
-                                      {pct !== null && pct !== undefined && (
-                                        <span className="text-gray-400">({pct}% resp)</span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          }}
-                        />
-                        <Legend />
-                        {keys.map((key, i) => (
-                          <Line
-                            key={key}
-                            type="monotone"
-                            dataKey={key}
-                            stroke={colors[i % colors.length]}
-                            strokeWidth={key === "Overall" ? 2.5 : 1.5}
-                            strokeDasharray={key === "Overall" ? "6 3" : undefined}
-                            dot={{ r: 3 }}
-                            connectNulls={false}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <p className="text-xs text-gray-400 mt-2">Lower is better · non-responded leads count their elapsed business hours (capped at 7 days) · walk-ins excluded · hover for response rate</p>
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Conversion Rate Over Time */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-navy">Conversion Rate Over Time</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Percentage of leads that converted per calendar month · April 2026 onward</p>
-              </div>
-              {!trendsData?.months ? (
-                <LoadingSkeleton height="h-72" />
-              ) : trendsData.months.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
-              ) : (() => {
-                const chartData = trendsData.months.map((m) => {
-                  const row = { month: m.label };
-                  if (m.overall.conversionRate !== null) row["Overall"] = m.overall.conversionRate;
-                  for (const marina of trendsData.marinas) {
-                    const v = m.byMarina[marina]?.conversionRate;
-                    if (v !== null && v !== undefined) row[marina] = v;
-                  }
-                  return row;
-                });
-                const keys = ["Overall", ...trendsData.marinas];
-                const colors = ["#64748b", ...MARINA_COLORS];
-                return (
-                  <>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={chartData} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={48} domain={[0, "auto"]} />
-                        <Tooltip formatter={(value, name) => [`${value}%`, name]} />
-                        <Legend />
-                        {keys.map((key, i) => (
-                          <Line
-                            key={key}
-                            type="monotone"
-                            dataKey={key}
-                            stroke={colors[i % colors.length]}
-                            strokeWidth={key === "Overall" ? 2.5 : 1.5}
-                            strokeDasharray={key === "Overall" ? "6 3" : undefined}
-                            dot={{ r: 3 }}
-                            connectNulls={false}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <p className="text-xs text-gray-400 mt-2">Higher is better · gaps indicate no data for that marina/month</p>
-                  </>
-                );
-              })()}
-            </div>
-
-          </>)}
+          {pageTab === "trends" && (
+            <TrendsTab
+              trendsData={trendsData}
+              selectedMarinas={selectedMarinas}
+              setSelectedMarinas={setSelectedMarinas}
+              leaderboardSort={leaderboardSort}
+              setLeaderboardSort={setLeaderboardSort}
+            />
+          )}
         </main>
       </div>
     </>
+  );
+}
+
+function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboardSort, setLeaderboardSort }) {
+  if (!trendsData?.months) {
+    return <LoadingSkeleton height="h-72" />;
+  }
+  if (trendsData.months.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <p className="text-gray-400 text-sm text-center py-16">No data available yet for April 2026 onward.</p>
+      </div>
+    );
+  }
+
+  const months = trendsData.months;
+  const marinas = trendsData.marinas;
+
+  // If literally every month has zero leads, the API still returns a
+  // padded month range — show an explicit empty state instead of
+  // rendering blank charts and a leaderboard full of dashes.
+  const totalLeadsAllTime = months.reduce((s, m) => s + (m.overall.total || 0), 0);
+  if (totalLeadsAllTime === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <p className="text-gray-400 text-sm text-center py-16">No leads recorded yet for April 2026 onward — trends will appear here once data starts flowing.</p>
+      </div>
+    );
+  }
+
+  const colorMap = new Map();
+  marinas.forEach((m, i) => colorMap.set(m, MARINA_COLORS[i % MARINA_COLORS.length]));
+  colorMap.set("Overall", "#64748b");
+
+  // Current = last calendar month in the range; prior = the calendar
+  // month immediately before it. We deliberately do NOT skip empty
+  // months here so KPI labels always reflect the real "this month vs
+  // last month" comparison the user expects. If current is empty
+  // (no leads yet this month), the KPI value gracefully shows "—".
+  const current = months[months.length - 1] || null;
+  const prior = months.length >= 2 ? months[months.length - 2] : null;
+
+  function delta(curr, prev, lowerIsBetter = false) {
+    if (curr === null || curr === undefined || prev === null || prev === undefined) return null;
+    if (prev === 0) return null;
+    const change = curr - prev;
+    const pct = Math.round((change / prev) * 100);
+    const isImprovement = lowerIsBetter ? change < 0 : change > 0;
+    return { pct: Math.abs(pct), isImprovement, isFlat: change === 0, raw: change };
+  }
+
+  const speedDelta = delta(current?.overall.avgSpeedBizMinutes ?? null, prior?.overall.avgSpeedBizMinutes ?? null, true);
+  const convDelta = delta(current?.overall.conversionRate ?? null, prior?.overall.conversionRate ?? null, false);
+  const totalDelta = delta(current?.overall.total ?? null, prior?.overall.total ?? null, false);
+
+  function toggleMarina(name) {
+    setSelectedMarinas((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
+
+  const visibleSeries = ["Overall", ...marinas.filter((m) => selectedMarinas.has(m))];
+
+  const speedChart = months.map((m) => {
+    const row = { month: m.label, _resp: {} };
+    if (m.overall.avgSpeedBizMinutes !== null) {
+      row["Overall"] = m.overall.avgSpeedBizMinutes;
+      row._resp["Overall"] = m.overall.respondedPct;
+    }
+    for (const marina of marinas) {
+      if (!selectedMarinas.has(marina)) continue;
+      const bm = m.byMarina[marina];
+      if (bm?.avgSpeedBizMinutes !== null && bm?.avgSpeedBizMinutes !== undefined) {
+        row[marina] = bm.avgSpeedBizMinutes;
+        row._resp[marina] = bm.respondedPct ?? null;
+      }
+    }
+    return row;
+  });
+
+  const convChart = months.map((m) => {
+    const row = { month: m.label };
+    if (m.overall.conversionRate !== null) row["Overall"] = m.overall.conversionRate;
+    for (const marina of marinas) {
+      if (!selectedMarinas.has(marina)) continue;
+      const v = m.byMarina[marina]?.conversionRate;
+      if (v !== null && v !== undefined) row[marina] = v;
+    }
+    return row;
+  });
+
+  const lbRows = marinas.map((marina) => {
+    const cur = current?.byMarina[marina];
+    const prv = prior?.byMarina[marina];
+    return {
+      marina,
+      speed: cur?.avgSpeedBizMinutes ?? null,
+      speedDelta: delta(cur?.avgSpeedBizMinutes ?? null, prv?.avgSpeedBizMinutes ?? null, true),
+      conv: cur?.conversionRate ?? null,
+      convDelta: delta(cur?.conversionRate ?? null, prv?.conversionRate ?? null, false),
+      total: cur?.total ?? 0,
+      totalDelta: delta(cur?.total ?? 0, prv?.total ?? 0, false),
+    };
+  });
+
+  const sortedLb = [...lbRows].sort((a, b) => {
+    const key = leaderboardSort.key;
+    const av = a[key];
+    const bv = b[key];
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return leaderboardSort.dir === "asc" ? av - bv : bv - av;
+  });
+
+  function setSort(key) {
+    setLeaderboardSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      return { key, dir: key === "speed" ? "asc" : "desc" };
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard
+          label={`Avg Speed to Lead — ${current?.label ?? "—"}`}
+          value={formatSpeedToLead(current?.overall.avgSpeedBizMinutes ?? null)}
+          delta={speedDelta}
+          priorLabel={prior?.label}
+        />
+        <KpiCard
+          label={`Conversion Rate — ${current?.label ?? "—"}`}
+          value={current?.overall.conversionRate === null || current?.overall.conversionRate === undefined ? "—" : `${current.overall.conversionRate}%`}
+          delta={convDelta}
+          priorLabel={prior?.label}
+        />
+        <KpiCard
+          label={`Total Leads — ${current?.label ?? "—"}`}
+          value={(current?.overall.total ?? 0).toLocaleString()}
+          delta={totalDelta}
+          priorLabel={prior?.label}
+          neutral
+        />
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-navy">Compare marinas</h3>
+            <p className="text-xs text-gray-400">Click a marina to add it to the charts. Overall is always shown.</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedMarinas(new Set(marinas))}
+              className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 text-gray-600"
+            >Show all</button>
+            <button
+              onClick={() => setSelectedMarinas(new Set())}
+              className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 text-gray-600"
+            >Clear</button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+            <span className="inline-block w-2 h-2 rounded-sm" style={{ background: "#64748b" }} />
+            Overall <span className="text-slate-400">(always on)</span>
+          </span>
+          {marinas.map((marina) => {
+            const on = selectedMarinas.has(marina);
+            return (
+              <button
+                key={marina}
+                onClick={() => toggleMarina(marina)}
+                className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  on ? "bg-navy text-white border-navy" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: colorMap.get(marina) }} />
+                {marina}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-navy">Speed to Lead Over Time</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Average business-minute response time per calendar month · April 2026 onward · lower is better</p>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={speedChart} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatSpeedToLead(v)} width={64} />
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (!active || !payload || !payload.length) return null;
+                return (
+                  <div className="bg-white border rounded shadow-sm px-3 py-2 text-xs">
+                    <div className="font-semibold text-navy mb-1">{label}</div>
+                    {payload.map((p) => {
+                      const pct = p.payload?._resp?.[p.name];
+                      return (
+                        <div key={p.name} className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-sm" style={{ background: p.color }} />
+                          <span className="text-gray-700">{p.name}:</span>
+                          <span className="font-semibold">{formatSpeedToLead(p.value)}</span>
+                          {pct !== null && pct !== undefined && (
+                            <span className="text-gray-400">({pct}% resp)</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }}
+            />
+            {visibleSeries.map((key) => (
+              <Line
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={colorMap.get(key)}
+                strokeWidth={key === "Overall" ? 2.5 : 1.5}
+                strokeDasharray={key === "Overall" ? "6 3" : undefined}
+                dot={{ r: 3 }}
+                connectNulls={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-navy">Conversion Rate Over Time</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Percentage of leads that converted per calendar month · April 2026 onward · higher is better</p>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={convChart} margin={{ left: 8, right: 24, top: 8, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} width={48} domain={[0, "auto"]} />
+            <Tooltip formatter={(value, name) => [`${value}%`, name]} />
+            {visibleSeries.map((key) => (
+              <Line
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={colorMap.get(key)}
+                strokeWidth={key === "Overall" ? 2.5 : 1.5}
+                strokeDasharray={key === "Overall" ? "6 3" : undefined}
+                dot={{ r: 3 }}
+                connectNulls={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold text-navy">Marina Leaderboard — {current?.label ?? "—"}</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Click a column header to sort · Δ shows change vs {prior?.label ?? "prior month"}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-gray-500 border-b">
+                <th className="py-2 pr-4">Marina</th>
+                <SortableTh active={leaderboardSort.key === "speed"} dir={leaderboardSort.dir} onClick={() => setSort("speed")}>Speed to Lead</SortableTh>
+                <SortableTh active={leaderboardSort.key === "conv"} dir={leaderboardSort.dir} onClick={() => setSort("conv")}>Conversion %</SortableTh>
+                <SortableTh active={leaderboardSort.key === "total"} dir={leaderboardSort.dir} onClick={() => setSort("total")}>Leads</SortableTh>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedLb.map((row) => (
+                <tr key={row.marina} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: colorMap.get(row.marina) }} />
+                      <span className="font-medium text-navy">{row.marina}</span>
+                    </div>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-navy w-16 inline-block">{formatSpeedToLead(row.speed)}</span>
+                      <DeltaPill d={row.speedDelta} />
+                    </div>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-navy w-16 inline-block">{row.conv === null ? "—" : `${row.conv}%`}</span>
+                      <DeltaPill d={row.convDelta} />
+                    </div>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-navy w-12 inline-block">{row.total.toLocaleString()}</span>
+                      <DeltaPill d={row.totalDelta} neutral />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, delta, priorLabel, neutral }) {
+  let deltaEl;
+  if (!delta) {
+    deltaEl = <span className="text-xs text-gray-300">no prior month yet</span>;
+  } else if (delta.isFlat) {
+    deltaEl = <span className="text-xs text-gray-400">no change vs {priorLabel}</span>;
+  } else {
+    const color = neutral ? "text-gray-500" : (delta.isImprovement ? "text-emerald-600" : "text-red-500");
+    const arrow = delta.raw > 0 ? "▲" : "▼";
+    deltaEl = (
+      <span className={`text-xs font-medium ${color}`}>{arrow} {delta.pct}% vs {priorLabel}</span>
+    );
+  }
+  return (
+    <div className="bg-white rounded-xl shadow-sm border p-5">
+      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-3xl font-bold mt-1 text-navy">{value}</p>
+      <p className="mt-1">{deltaEl}</p>
+    </div>
+  );
+}
+
+function DeltaPill({ d, neutral }) {
+  if (!d) return <span className="text-xs text-gray-300">—</span>;
+  if (d.isFlat) return <span className="text-xs text-gray-400">0%</span>;
+  const color = neutral
+    ? "text-gray-600 bg-gray-100"
+    : (d.isImprovement ? "text-emerald-700 bg-emerald-50" : "text-red-700 bg-red-50");
+  const arrow = d.raw > 0 ? "▲" : "▼";
+  return (
+    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${color}`}>{arrow} {d.pct}%</span>
+  );
+}
+
+function SortableTh({ children, active, dir, onClick }) {
+  return (
+    <th className="py-2 pr-4 cursor-pointer select-none" onClick={onClick}>
+      <span className={`inline-flex items-center gap-1 ${active ? "text-navy" : "text-gray-500"}`}>
+        {children}
+        {active && <span className="text-[10px]">{dir === "asc" ? "▲" : "▼"}</span>}
+      </span>
+    </th>
   );
 }
 
