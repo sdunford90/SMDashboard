@@ -1,0 +1,84 @@
+2026-05-05 09:28:15.71
+7bba9d31
+System
+system: received signal terminated
+2026-05-05 09:28:16.55
+3bb22162
+User
+> MALLOC_ARENA_MAX=2 node --expose-gc --max-old-space-size=768 --max-semi-space-size=32 node_modules/.bin/next start -p ${PORT:-5000} -H 0.0.0.0
+2026-05-05 09:28:16.55
+3bb22162
+User
+> smdashboard@0.1.0 start
+2026-05-05 09:28:22.50
+3bb22162
+User
+▲ Next.js 14.2.35
+2026-05-05 09:28:22.50
+3bb22162
+User
+- Local: http://localhost:3000
+2026-05-05 09:28:22.50
+3bb22162
+User
+- Network: http://0.0.0.0:3000
+2026-05-05 09:28:22.50
+3bb22162
+User
+✓ Starting...
+2026-05-05 09:28:24.18
+3bb22162
+User
+✓ Ready in 5s
+2026-05-05 09:28:24.30
+3bb22162
+User
+To prepare for this change:
+2026-05-05 09:28:24.30
+3bb22162
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-05-05 09:28:24.30
+3bb22162
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-05-05 09:28:24.30
+3bb22162
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-05-05 09:28:24.30
+3bb22162
+User
+(Use `node --trace-warnings ...` to show where the warning was created)
+2026-05-05 09:28:24.30
+3bb22162
+User
+(node:28) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-05-05 09:28:24.30
+3bb22162
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-05-05 09:28:25.27
+3bb22162
+User
+[warmup] Classifier metrics restored from DB.
+2026-05-05 09:33:24.17
+3bb22162
+User
+[heartbeat] pid=28 up=307s rss=93MB heap=35/37MB
+2026-05-05 09:38:24.17
+3bb22162
+User
+[heartbeat] pid=28 up=607s rss=94MB heap=36/38MB
+2026-05-05 09:43:24.17
+3bb22162
+User
+[heartbeat] pid=28 up=907s rss=95MB heap=34/38MB
+2026-05-05 09:48:24.18
+3bb22162
+User
+[heartbeat] pid=28 up=1207s rss=96MB heap=35/38MB
+2026-05-05 09:49:52.01
+3bb22162
+User
+[leads-tables] getSyncState error: Connection terminated due to connection timeout
