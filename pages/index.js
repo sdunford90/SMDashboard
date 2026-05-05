@@ -2051,6 +2051,11 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
   const convDelta = delta(current?.overall.conversionRate ?? null, prior?.overall.conversionRate ?? null, false);
   const totalDelta = delta(current?.overall.total ?? null, prior?.overall.total ?? null, false);
 
+  // Sparkline series across the full month range (overall + per-marina).
+  const overallSpeedSeries = months.map((m) => m.overall.avgSpeedBizMinutes);
+  const overallConvSeries = months.map((m) => m.overall.conversionRate);
+  const overallTotalSeries = months.map((m) => m.overall.total ?? 0);
+
   function toggleMarina(name) {
     setSelectedMarinas((prev) => {
       const next = new Set(prev);
@@ -2096,8 +2101,10 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
       marina,
       speed: cur?.avgSpeedBizMinutes ?? null,
       speedDelta: delta(cur?.avgSpeedBizMinutes ?? null, prv?.avgSpeedBizMinutes ?? null, true),
+      speedSeries: months.map((m) => m.byMarina[marina]?.avgSpeedBizMinutes ?? null),
       conv: cur?.conversionRate ?? null,
       convDelta: delta(cur?.conversionRate ?? null, prv?.conversionRate ?? null, false),
+      convSeries: months.map((m) => m.byMarina[marina]?.conversionRate ?? null),
       total: cur?.total ?? 0,
       totalDelta: delta(cur?.total ?? 0, prv?.total ?? 0, false),
     };
@@ -2128,12 +2135,14 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
           value={formatSpeedToLead(current?.overall.avgSpeedBizMinutes ?? null)}
           delta={speedDelta}
           priorLabel={prior?.label}
+          series={overallSpeedSeries}
         />
         <KpiCard
           label={`Conversion Rate — ${current?.label ?? "—"}`}
           value={current?.overall.conversionRate === null || current?.overall.conversionRate === undefined ? "—" : `${current.overall.conversionRate}%`}
           delta={convDelta}
           priorLabel={prior?.label}
+          series={overallConvSeries}
         />
         <KpiCard
           label={`Total Leads — ${current?.label ?? "—"}`}
@@ -2141,6 +2150,7 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
           delta={totalDelta}
           priorLabel={prior?.label}
           neutral
+          series={overallTotalSeries}
         />
       </div>
 
@@ -2287,12 +2297,14 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-navy w-16 inline-block">{formatSpeedToLead(row.speed)}</span>
+                      <Sparkline data={row.speedSeries} color={colorMap.get(row.marina)} width={70} height={22} />
                       <DeltaPill d={row.speedDelta} />
                     </div>
                   </td>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-navy w-16 inline-block">{row.conv === null ? "—" : `${row.conv}%`}</span>
+                      <Sparkline data={row.convSeries} color={colorMap.get(row.marina)} width={70} height={22} />
                       <DeltaPill d={row.convDelta} />
                     </div>
                   </td>
@@ -2312,7 +2324,7 @@ function TrendsTab({ trendsData, selectedMarinas, setSelectedMarinas, leaderboar
   );
 }
 
-function KpiCard({ label, value, delta, priorLabel, neutral }) {
+function KpiCard({ label, value, delta, priorLabel, neutral, series, sparkColor }) {
   let deltaEl;
   if (!delta) {
     deltaEl = <span className="text-xs text-gray-300">no prior month yet</span>;
@@ -2330,7 +2342,60 @@ function KpiCard({ label, value, delta, priorLabel, neutral }) {
       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
       <p className="text-3xl font-bold mt-1 text-navy">{value}</p>
       <p className="mt-1">{deltaEl}</p>
+      {series && series.length > 1 && (
+        <div className="mt-3">
+          <Sparkline data={series} color={sparkColor || "#94a3b8"} width={240} height={32} />
+        </div>
+      )}
     </div>
+  );
+}
+
+function Sparkline({ data, color = "#94a3b8", width = 80, height = 24 }) {
+  const valid = data.filter((v) => v !== null && v !== undefined);
+  if (valid.length < 2) return <span className="text-gray-300 text-xs">—</span>;
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+  const stepX = data.length > 1 ? width / (data.length - 1) : 0;
+  const pad = 3;
+  const usableH = height - pad * 2;
+
+  const segments = [];
+  let currentSeg = [];
+  data.forEach((v, i) => {
+    if (v === null || v === undefined) {
+      if (currentSeg.length > 1) segments.push(currentSeg);
+      currentSeg = [];
+    } else {
+      const x = i * stepX;
+      const y = pad + (1 - (v - min) / range) * usableH;
+      currentSeg.push([x, y]);
+    }
+  });
+  if (currentSeg.length > 1) segments.push(currentSeg);
+
+  const lastIdx = data.length - 1;
+  const lastVal = data[lastIdx];
+  const lastDot = lastVal !== null && lastVal !== undefined
+    ? { x: lastIdx * stepX, y: pad + (1 - (lastVal - min) / range) * usableH }
+    : null;
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="inline-block align-middle" style={{ maxWidth: "100%" }}>
+      {segments.map((seg, i) => (
+        <polyline
+          key={i}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={seg.map(([x, y]) => `${x},${y}`).join(" ")}
+        />
+      ))}
+      {lastDot && <circle cx={lastDot.x} cy={lastDot.y} r="2" fill={color} />}
+    </svg>
   );
 }
 
