@@ -131,6 +131,7 @@ function formatLead(lead) {
     marina: lead.marina,
     ownerName: lead.ownerName,
     createDate: lead.createDate,
+    lastLeadActivityAt: lead.lastLeadActivityAt || null,
     hubspotUrl: lead.hubspotUrl,
     recentFormDate: lead.recentFormDate || null,
     recentFormName: lead.recentFormName || null,
