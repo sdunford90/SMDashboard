@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 
 function pct(n) {
@@ -6,22 +6,80 @@ function pct(n) {
   return `${(n * 100).toFixed(1)}%`;
 }
 
+function isoDay(d) {
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${yr}-${mo}-${da}`;
+}
+
+const QUICK_WINDOWS = [
+  { id: "7", label: "Last 7d" },
+  { id: "30", label: "Last 30d" },
+  { id: "90", label: "Last 90d" },
+  { id: "mtd", label: "Month to date" },
+  { id: "ytd", label: "All 2026" },
+];
+
+function rangeForQuick(id) {
+  const today = new Date();
+  const todayStr = isoDay(today);
+  if (id === "ytd") return { from: "2026-01-01", to: todayStr };
+  if (id === "mtd") {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { from: isoDay(first), to: todayStr };
+  }
+  const days = parseInt(id, 10);
+  if (!isNaN(days)) {
+    const start = new Date(today);
+    start.setDate(start.getDate() - (days - 1));
+    return { from: isoDay(start), to: todayStr };
+  }
+  return { from: "2026-01-01", to: todayStr };
+}
+
 export default function SourcesPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Default to all-2026 to match the previous behavior on first load.
+  const [range, setRange] = useState(() => rangeForQuick("ytd"));
+  const [activeQuick, setActiveQuick] = useState("ytd");
 
   useEffect(() => {
-    fetch("/api/sources")
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams();
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+    fetch(`/api/sources?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, []);
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
+  }, [range.from, range.to]);
+
+  function applyQuick(id) {
+    setActiveQuick(id);
+    setRange(rangeForQuick(id));
+  }
+
+  function applyCustom(field, value) {
+    setActiveQuick(null);
+    setRange((prev) => ({ ...prev, [field]: value }));
+  }
 
   // Group property×source rows by property for the detailed table.
-  const grouped = React.useMemo(() => {
+  const grouped = useMemo(() => {
     if (!data?.rows) return [];
     const map = new Map();
     for (const row of data.rows) {
@@ -38,6 +96,12 @@ export default function SourcesPage() {
       .sort((a, b) => b.total - a.total);
   }, [data]);
 
+  const windowText = data
+    ? `${new Date(data.windowStart).toLocaleDateString()} → ${
+        data.windowEnd ? new Date(data.windowEnd).toLocaleDateString() : "today"
+      }`
+    : "";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Head>
@@ -48,10 +112,48 @@ export default function SourcesPage() {
           <h1 className="text-2xl font-semibold text-navy">Close Ratio by Source</h1>
           <p className="text-sm text-gray-500 mt-1">
             Per-property breakdown of leads grouped by acquisition channel.
-            {data?.windowStart && (
-              <> Window: {new Date(data.windowStart).toLocaleDateString()} → today.</>
-            )}
+            {data && <> Window: {windowText}.</>}
           </p>
+
+          {/* Date controls */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-1">
+              {QUICK_WINDOWS.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => applyQuick(w.id)}
+                  className={`px-2.5 py-1.5 rounded text-xs font-medium border transition-colors ${
+                    activeQuick === w.id
+                      ? "bg-navy text-white border-navy"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <label className="flex items-center gap-1">
+                From
+                <input
+                  type="date"
+                  value={range.from || ""}
+                  onChange={(e) => applyCustom("from", e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-navy/40"
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                To
+                <input
+                  type="date"
+                  value={range.to || ""}
+                  onChange={(e) => applyCustom("to", e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-navy/40"
+                />
+              </label>
+              {loading && <span className="text-gray-400 italic ml-2">Loading…</span>}
+            </div>
+          </div>
         </div>
       </header>
 

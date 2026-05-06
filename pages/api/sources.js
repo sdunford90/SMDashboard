@@ -29,20 +29,41 @@ function bucketSource(lead) {
   return "Other";
 }
 
-const WINDOW_START = new Date("2026-01-01T00:00:00.000Z");
+const DEFAULT_WINDOW_START = new Date("2026-01-01T00:00:00.000Z");
+
+function parseDateParam(v, fallback) {
+  if (!v) return fallback;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return fallback;
+  return d;
+}
 
 export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
 
-    const eligible = leads.filter(
-      (l) =>
-        !l.isSpam &&
-        l.createDate &&
-        new Date(l.createDate) >= WINDOW_START &&
-        l.marina &&
-        l.marina !== "Unknown"
-    );
+    // Date window — defaults to "all 2026" if no params supplied.
+    // `from` is inclusive at start of day; `to` is inclusive at end of day.
+    const fromRaw = req.query.from;
+    const toRaw = req.query.to;
+    const from = parseDateParam(fromRaw, DEFAULT_WINDOW_START);
+    const to = parseDateParam(toRaw, null);
+    // Normalize "from" to start of UTC day, "to" to end of UTC day so a
+    // user picking "May 1 → May 5" gets all of May 5 included.
+    const fromMs = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+    const toMs = to
+      ? Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate(), 23, 59, 59, 999)
+      : null;
+
+    const eligible = leads.filter((l) => {
+      if (l.isSpam) return false;
+      if (!l.createDate) return false;
+      if (!l.marina || l.marina === "Unknown") return false;
+      const t = new Date(l.createDate).getTime();
+      if (t < fromMs) return false;
+      if (toMs !== null && t > toMs) return false;
+      return true;
+    });
 
     // (property, source) -> { total, converted }
     const cellMap = new Map();
@@ -96,7 +117,8 @@ export default async function handler(req, res) {
     const totalConverted = eligible.filter((l) => l.isCustomer).length;
 
     res.status(200).json({
-      windowStart: WINDOW_START.toISOString(),
+      windowStart: new Date(fromMs).toISOString(),
+      windowEnd: toMs !== null ? new Date(toMs).toISOString() : null,
       totals: {
         leads: totalLeads,
         converted: totalConverted,
