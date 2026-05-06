@@ -46,6 +46,7 @@ export default function SourcesPage() {
   // Default to all-2026 to match the previous behavior on first load.
   const [range, setRange] = useState(() => rangeForQuick("ytd"));
   const [activeQuick, setActiveQuick] = useState("ytd");
+  const [selectedProperty, setSelectedProperty] = useState("__all__");
 
   useEffect(() => {
     setLoading(true);
@@ -78,11 +79,58 @@ export default function SourcesPage() {
     setRange((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Full list of properties (for the selector) — derived from all rows
+  // before any property filter is applied.
+  const allProperties = useMemo(() => {
+    if (!data?.byProperty) return [];
+    return data.byProperty.map((r) => r.property).sort((a, b) => a.localeCompare(b));
+  }, [data]);
+
+  const propertyFilterActive = selectedProperty && selectedProperty !== "__all__";
+
+  // Filter the dataset client-side when a property is selected.
+  const filteredRows = useMemo(() => {
+    if (!data?.rows) return [];
+    if (!propertyFilterActive) return data.rows;
+    return data.rows.filter((r) => r.property === selectedProperty);
+  }, [data, selectedProperty, propertyFilterActive]);
+
+  const filteredByProperty = useMemo(() => {
+    if (!data?.byProperty) return [];
+    if (!propertyFilterActive) return data.byProperty;
+    return data.byProperty.filter((r) => r.property === selectedProperty);
+  }, [data, selectedProperty, propertyFilterActive]);
+
+  // When a property is selected, recompute By-Source and totals from the
+  // filtered cell rows so the numbers reflect just that property.
+  const filteredBySource = useMemo(() => {
+    if (!data) return [];
+    if (!propertyFilterActive) return data.bySource;
+    const m = new Map();
+    for (const r of filteredRows) {
+      if (!m.has(r.source)) m.set(r.source, { source: r.source, total: 0, converted: 0 });
+      const s = m.get(r.source);
+      s.total += r.total;
+      s.converted += r.converted;
+    }
+    return Array.from(m.values())
+      .map((r) => ({ ...r, closeRatio: r.total > 0 ? r.converted / r.total : 0 }))
+      .sort((a, b) => b.total - a.total);
+  }, [data, filteredRows, propertyFilterActive]);
+
+  const filteredTotals = useMemo(() => {
+    if (!data) return null;
+    if (!propertyFilterActive) return data.totals;
+    const leads = filteredRows.reduce((s, r) => s + r.total, 0);
+    const converted = filteredRows.reduce((s, r) => s + r.converted, 0);
+    return { leads, converted, closeRatio: leads > 0 ? converted / leads : 0 };
+  }, [data, filteredRows, propertyFilterActive]);
+
   // Group property×source rows by property for the detailed table.
   const grouped = useMemo(() => {
-    if (!data?.rows) return [];
+    if (!filteredRows.length) return [];
     const map = new Map();
-    for (const row of data.rows) {
+    for (const row of filteredRows) {
       if (!map.has(row.property)) map.set(row.property, []);
       map.get(row.property).push(row);
     }
@@ -94,7 +142,7 @@ export default function SourcesPage() {
         converted: rows.reduce((s, r) => s + r.converted, 0),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [data]);
+  }, [filteredRows]);
 
   const windowText = data
     ? `${new Date(data.windowStart).toLocaleDateString()} → ${
@@ -153,6 +201,23 @@ export default function SourcesPage() {
               </label>
               {loading && <span className="text-gray-400 italic ml-2">Loading…</span>}
             </div>
+            <div className="flex items-center gap-2 text-xs text-gray-600 ml-auto">
+              <label className="flex items-center gap-1">
+                Property
+                <select
+                  value={selectedProperty}
+                  onChange={(e) => setSelectedProperty(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-navy/40 bg-white"
+                >
+                  <option value="__all__">All properties</option>
+                  {allProperties.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
         </div>
       </header>
@@ -174,22 +239,24 @@ export default function SourcesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white rounded-xl border p-5">
                 <div className="text-xs uppercase text-gray-500 font-medium">Total Leads</div>
-                <div className="text-2xl font-semibold text-navy mt-1">{data.totals.leads}</div>
+                <div className="text-2xl font-semibold text-navy mt-1">{filteredTotals.leads}</div>
               </div>
               <div className="bg-white rounded-xl border p-5">
                 <div className="text-xs uppercase text-gray-500 font-medium">Converted</div>
-                <div className="text-2xl font-semibold text-emerald-600 mt-1">{data.totals.converted}</div>
+                <div className="text-2xl font-semibold text-emerald-600 mt-1">{filteredTotals.converted}</div>
               </div>
               <div className="bg-white rounded-xl border p-5">
                 <div className="text-xs uppercase text-gray-500 font-medium">Overall Close Ratio</div>
-                <div className="text-2xl font-semibold text-gold mt-1">{pct(data.totals.closeRatio)}</div>
+                <div className="text-2xl font-semibold text-gold mt-1">{pct(filteredTotals.closeRatio)}</div>
               </div>
             </div>
 
             {/* By Source */}
             <section className="bg-white rounded-xl border overflow-hidden">
               <div className="px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-navy">By Source (all properties)</h2>
+                <h2 className="text-lg font-semibold text-navy">
+                  By Source ({propertyFilterActive ? selectedProperty : "all properties"})
+                </h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -202,7 +269,7 @@ export default function SourcesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.bySource.map((row) => (
+                    {filteredBySource.map((row) => (
                       <tr key={row.source} className="border-b hover:bg-gray-50/60">
                         <td className="px-4 py-2 font-medium">{row.source}</td>
                         <td className="px-4 py-2 text-right">{row.total}</td>
@@ -231,7 +298,7 @@ export default function SourcesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.byProperty.map((row) => (
+                    {filteredByProperty.map((row) => (
                       <tr key={row.property} className="border-b hover:bg-gray-50/60">
                         <td className="px-4 py-2 font-medium">{row.property}</td>
                         <td className="px-4 py-2 text-right">{row.total}</td>
