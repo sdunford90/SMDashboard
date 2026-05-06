@@ -6,6 +6,50 @@ function pct(n) {
   return `${(n * 100).toFixed(1)}%`;
 }
 
+function cmp(a, b) {
+  if (a === b) return 0;
+  if (a === null || a === undefined) return 1;
+  if (b === null || b === undefined) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+function sortRows(rows, key, dir) {
+  if (!key) return rows;
+  const copy = [...rows];
+  copy.sort((a, b) => {
+    const r = cmp(a[key], b[key]);
+    return dir === "asc" ? r : -r;
+  });
+  return copy;
+}
+
+function SortHeader({ label, sortKey, state, setState, align = "left" }) {
+  const active = state.key === sortKey;
+  const arrow = !active ? "" : state.dir === "asc" ? " ▲" : " ▼";
+  const alignClass = align === "right" ? "text-right" : "text-left";
+  return (
+    <th className={`px-4 py-2 ${alignClass} text-xs font-semibold uppercase`}>
+      <button
+        type="button"
+        onClick={() =>
+          setState((prev) =>
+            prev.key === sortKey
+              ? { key: sortKey, dir: prev.dir === "asc" ? "desc" : "asc" }
+              : { key: sortKey, dir: align === "right" ? "desc" : "asc" }
+          )
+        }
+        className={`inline-flex items-center gap-0.5 hover:text-navy transition-colors ${
+          active ? "text-navy" : "text-gray-600"
+        }`}
+      >
+        {label}
+        <span className="text-[10px]">{arrow}</span>
+      </button>
+    </th>
+  );
+}
+
 function isoDay(d) {
   const yr = d.getFullYear();
   const mo = String(d.getMonth() + 1).padStart(2, "0");
@@ -47,6 +91,10 @@ export default function SourcesPage() {
   const [range, setRange] = useState(() => rangeForQuick("ytd"));
   const [activeQuick, setActiveQuick] = useState("ytd");
   const [selectedProperty, setSelectedProperty] = useState("__all__");
+
+  const [bySourceSort, setBySourceSort] = useState({ key: "total", dir: "desc" });
+  const [byPropertySort, setByPropertySort] = useState({ key: "total", dir: "desc" });
+  const [pxsSort, setPxsSort] = useState({ key: "total", dir: "desc" });
 
   useEffect(() => {
     setLoading(true);
@@ -126,7 +174,20 @@ export default function SourcesPage() {
     return { leads, converted, closeRatio: leads > 0 ? converted / leads : 0 };
   }, [data, filteredRows, propertyFilterActive]);
 
+  const sortedBySource = useMemo(
+    () => sortRows(filteredBySource, bySourceSort.key, bySourceSort.dir),
+    [filteredBySource, bySourceSort]
+  );
+
+  const sortedByProperty = useMemo(
+    () => sortRows(filteredByProperty, byPropertySort.key, byPropertySort.dir),
+    [filteredByProperty, byPropertySort]
+  );
+
   // Group property×source rows by property for the detailed table.
+  // Sort the property groups by the chosen column (using each group's
+  // aggregate for numeric columns, property name for the property column),
+  // and sort the source rows within each group by the same column.
   const grouped = useMemo(() => {
     if (!filteredRows.length) return [];
     const map = new Map();
@@ -134,15 +195,31 @@ export default function SourcesPage() {
       if (!map.has(row.property)) map.set(row.property, []);
       map.get(row.property).push(row);
     }
-    return Array.from(map.entries())
-      .map(([property, rows]) => ({
+    let groups = Array.from(map.entries()).map(([property, rows]) => {
+      const total = rows.reduce((s, r) => s + r.total, 0);
+      const converted = rows.reduce((s, r) => s + r.converted, 0);
+      return {
         property,
         rows,
-        total: rows.reduce((s, r) => s + r.total, 0),
-        converted: rows.reduce((s, r) => s + r.converted, 0),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [filteredRows]);
+        total,
+        converted,
+        closeRatio: total > 0 ? converted / total : 0,
+      };
+    });
+
+    // Inner row sort
+    const innerKey = pxsSort.key === "property" ? "source" : pxsSort.key;
+    groups = groups.map((g) => ({
+      ...g,
+      rows: sortRows(g.rows, innerKey, pxsSort.dir),
+    }));
+
+    // Group order
+    const groupKey = pxsSort.key === "source" ? "property" : pxsSort.key;
+    groups = sortRows(groups, groupKey, pxsSort.dir);
+
+    return groups;
+  }, [filteredRows, pxsSort]);
 
   const windowText = data
     ? `${new Date(data.windowStart).toLocaleDateString()} → ${
@@ -262,14 +339,14 @@ export default function SourcesPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Source</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Leads</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Converted</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Close Ratio</th>
+                      <SortHeader label="Source" sortKey="source" state={bySourceSort} setState={setBySourceSort} />
+                      <SortHeader label="Leads" sortKey="total" state={bySourceSort} setState={setBySourceSort} align="right" />
+                      <SortHeader label="Converted" sortKey="converted" state={bySourceSort} setState={setBySourceSort} align="right" />
+                      <SortHeader label="Close Ratio" sortKey="closeRatio" state={bySourceSort} setState={setBySourceSort} align="right" />
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredBySource.map((row) => (
+                    {sortedBySource.map((row) => (
                       <tr key={row.source} className="border-b hover:bg-gray-50/60">
                         <td className="px-4 py-2 font-medium">{row.source}</td>
                         <td className="px-4 py-2 text-right">{row.total}</td>
@@ -291,14 +368,14 @@ export default function SourcesPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Property</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Leads</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Converted</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Close Ratio</th>
+                      <SortHeader label="Property" sortKey="property" state={byPropertySort} setState={setByPropertySort} />
+                      <SortHeader label="Leads" sortKey="total" state={byPropertySort} setState={setByPropertySort} align="right" />
+                      <SortHeader label="Converted" sortKey="converted" state={byPropertySort} setState={setByPropertySort} align="right" />
+                      <SortHeader label="Close Ratio" sortKey="closeRatio" state={byPropertySort} setState={setByPropertySort} align="right" />
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredByProperty.map((row) => (
+                    {sortedByProperty.map((row) => (
                       <tr key={row.property} className="border-b hover:bg-gray-50/60">
                         <td className="px-4 py-2 font-medium">{row.property}</td>
                         <td className="px-4 py-2 text-right">{row.total}</td>
@@ -323,11 +400,11 @@ export default function SourcesPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Property</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Source</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Leads</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Converted</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Close Ratio</th>
+                      <SortHeader label="Property" sortKey="property" state={pxsSort} setState={setPxsSort} />
+                      <SortHeader label="Source" sortKey="source" state={pxsSort} setState={setPxsSort} />
+                      <SortHeader label="Leads" sortKey="total" state={pxsSort} setState={setPxsSort} align="right" />
+                      <SortHeader label="Converted" sortKey="converted" state={pxsSort} setState={setPxsSort} align="right" />
+                      <SortHeader label="Close Ratio" sortKey="closeRatio" state={pxsSort} setState={setPxsSort} align="right" />
                     </tr>
                   </thead>
                   <tbody>
