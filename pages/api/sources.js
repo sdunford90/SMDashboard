@@ -1,18 +1,99 @@
 import { getAllLeadsData } from "../../lib/leads";
 
-// Map a lead's classified source (using hsSource where available, falling
-// back to leadSource) to the coarse acquisition-channel buckets we want to
-// report on the hidden /sources page.
-function bucketSource(lead) {
+// --- UTM / referrer parsing helpers --------------------------------------
+//
+// HubSpot's hs_analytics_source attribution is unreliable for traffic that
+// hits the marina site via in-app browsers (Facebook, Instagram), URL
+// shorteners, or any path that strips document.referrer. Many of those
+// leads end up tagged DIRECT_TRAFFIC even though their first-referrer URL
+// clearly contains UTM parameters or platform click-IDs identifying the
+// real source.
+//
+// We re-derive the channel by parsing UTM params and known click-ID
+// markers out of `firstReferrer` and `firstUrl`, then fall back to the
+// referrer hostname, then HubSpot's native attribution as a last resort.
+// -------------------------------------------------------------------------
+
+function parseUrlParts(raw) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const params = {};
+    for (const [k, v] of u.searchParams.entries()) {
+      params[k.toLowerCase()] = (v || "").toLowerCase();
+    }
+    return { host: u.hostname.toLowerCase(), params };
+  } catch {
+    return null;
+  }
+}
+
+function bucketFromUtmAndClickIds(parts) {
+  if (!parts) return null;
+  const p = parts.params;
+
+  // Explicit click-IDs are the strongest signal — they identify the ad
+  // network even if utm tags are missing or wrong.
+  if (p.fbclid || p.hsa_net === "facebook" || p.hsa_src === "ig") return "Social Media";
+  if (p.gclid || p.gbraid || p.wbraid) return "Google PPC";
+  if (p.msclkid) return "Bing Ads";
+  if (p.li_fat_id) return "Social Media"; // LinkedIn
+  if (p.ttclid) return "Social Media";    // TikTok
+  if (p.twclid) return "Social Media";    // Twitter/X
+
+  const src = p.utm_source || "";
+  const med = p.utm_medium || "";
+
+  if (med === "cpc" || med === "ppc" || med === "paid") {
+    if (src.includes("google")) return "Google PPC";
+    if (src.includes("bing")) return "Bing Ads";
+    if (src.includes("facebook") || src.includes("instagram") || src.includes("meta")) return "Social Media";
+    return "Paid Other";
+  }
+  if (med.includes("paidsocial") || med === "social" || med === "paid_social") return "Social Media";
+  if (med === "email") return "Email";
+  if (med === "organic" && src.includes("google")) return "Organic Search";
+  if (med === "referral") return "Referral";
+
+  if (src) {
+    if (src.includes("facebook") || src.includes("instagram") || src.includes("meta") || src.includes("ig")) return "Social Media";
+    if (src.includes("google")) return src === "google" && !med ? "Organic Search" : "Google PPC";
+    if (src.includes("bing")) return "Bing Ads";
+    if (src.includes("yahoo")) return "Organic Search";
+    if (src.includes("linkedin") || src.includes("tiktok") || src.includes("twitter") || src.includes("x.com")) return "Social Media";
+    if (src.includes("email") || src.includes("newsletter") || src.includes("mailchimp")) return "Email";
+  }
+  return null;
+}
+
+function bucketFromReferrerHost(parts, leadMarinaSlugs) {
+  if (!parts || !parts.host) return null;
+  const h = parts.host;
+
+  if (h.includes("facebook.") || h === "fb.me" || h.includes("instagram.") || h.includes("l.facebook")) return "Social Media";
+  if (h.includes("linkedin.") || h.includes("t.co") || h.includes("twitter.") || h.includes("x.com") || h.includes("tiktok.") || h.includes("pinterest.")) return "Social Media";
+  if (h.includes("google.")) return "Organic Search"; // (paid would have gclid → already caught)
+  if (h.includes("bing.") || h.includes("duckduckgo.") || h.includes("yahoo.")) return "Organic Search";
+  if (h.includes("youtube.")) return "Social Media";
+  if (h.includes("mail.") || h.includes("outlook.") || h.includes("gmail")) return "Email";
+
+  // The marina's own site as referrer means the user was already on-site
+  // when tracking attached — this is HubSpot's classic "looks direct but
+  // isn't" case. Don't claim a channel; let the caller fall back.
+  if (leadMarinaSlugs && leadMarinaSlugs.some((slug) => h.includes(slug))) return null;
+
+  return "Referral"; // any other external site
+}
+
+// Map HubSpot's coarse hs_analytics_source enum onto our buckets, used
+// as the final fallback when neither UTMs nor referrer give a signal.
+function bucketFromHubSpotSource(lead) {
   const hs = (lead.hsSource || "").trim();
   const ls = (lead.leadSource || "").trim();
-
-  // Rep-entered sources (CRM_UI) come through hsSource as the raw
-  // lead_source label, e.g. "Phone Call", "Walk-In", "Referral".
   const hsLower = hs.toLowerCase();
+
   if (hsLower.includes("walk")) return "Walk-in";
   if (hsLower.includes("phone") || hsLower === "call") return "Call";
-
   if (hs === "Social Media" || hs === "Social (Form)") return "Social Media";
   if (hs === "Referral" || hs === "Referral (Form)" || hsLower.includes("referral")) return "Referral";
   if (hs === "Paid Search" || hs === "Paid Search (Form)") return "Google PPC";
@@ -25,8 +106,54 @@ function bucketSource(lead) {
   if (ls === "Call") return "Call";
   if (ls === "Web Form") return "Web Form";
   if (ls === "Digital") return "Other";
-
   return "Other";
+}
+
+// Slugs we treat as the marina's own domain when they show up in the
+// referrer host. Sourced from the public sites observed in the probe;
+// extend as needed. We also auto-build a slug from the marina name on
+// the lead in case a property's site isn't listed here.
+const KNOWN_MARINA_HOSTS = [
+  "allseasonsmarina", "stockislandmarinafl", "elliottbaymarina", "harbortownmarina",
+  "millstonemarinas", "timsfordmarina", "haydenlakemarina", "sequoyahmarina",
+  "sanmarcomarina", "fourcornersresortandmarina", "oceanislemarina", "westshoremarina",
+  "cedarcreekmarina", "calabashmarina", "grandharborresortandmarina", "f3marinafl",
+  "southernmarinas",
+];
+
+function ownDomainSlugsFor(lead) {
+  const slugs = [...KNOWN_MARINA_HOSTS];
+  if (lead.marina) {
+    const slug = lead.marina.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (slug.length > 4) slugs.push(slug);
+  }
+  return slugs;
+}
+
+function bucketSource(lead) {
+  const hsLower = (lead.hsSource || "").toLowerCase();
+
+  // Rep-entered records (CRM_UI) bypass referrer logic entirely.
+  if (hsLower.includes("walk")) return "Walk-in";
+  if (hsLower.includes("phone") || hsLower === "call") return "Call";
+
+  const refParts = parseUrlParts(lead.firstReferrer);
+  const urlParts = parseUrlParts(lead.firstUrl);
+
+  // 1) UTMs / click-IDs on the landing URL (strongest — campaign tags)
+  let bucket = bucketFromUtmAndClickIds(urlParts);
+  if (bucket) return bucket;
+
+  // 2) UTMs / click-IDs on the referring URL
+  bucket = bucketFromUtmAndClickIds(refParts);
+  if (bucket) return bucket;
+
+  // 3) Referrer hostname (google.com, m.facebook.com, etc.)
+  bucket = bucketFromReferrerHost(refParts, ownDomainSlugsFor(lead));
+  if (bucket) return bucket;
+
+  // 4) HubSpot's native source enum as last resort
+  return bucketFromHubSpotSource(lead);
 }
 
 const DEFAULT_WINDOW_START = new Date("2026-01-01T00:00:00.000Z");
@@ -42,14 +169,10 @@ export default async function handler(req, res) {
   try {
     const { leads } = await getAllLeadsData();
 
-    // Date window — defaults to "all 2026" if no params supplied.
-    // `from` is inclusive at start of day; `to` is inclusive at end of day.
     const fromRaw = req.query.from;
     const toRaw = req.query.to;
     const from = parseDateParam(fromRaw, DEFAULT_WINDOW_START);
     const to = parseDateParam(toRaw, null);
-    // Normalize "from" to start of UTC day, "to" to end of UTC day so a
-    // user picking "May 1 → May 5" gets all of May 5 included.
     const fromMs = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
     const toMs = to
       ? Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate(), 23, 59, 59, 999)
@@ -65,7 +188,6 @@ export default async function handler(req, res) {
       return true;
     });
 
-    // (property, source) -> { total, converted }
     const cellMap = new Map();
     const sourceMap = new Map();
     const propertyMap = new Map();
