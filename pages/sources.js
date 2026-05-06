@@ -96,6 +96,8 @@ export default function SourcesPage() {
   const [byPropertySort, setByPropertySort] = useState({ key: "total", dir: "desc" });
   const [pxsSort, setPxsSort] = useState({ key: "total", dir: "desc" });
 
+  const [drillDown, setDrillDown] = useState(null); // { property, leads }
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -379,7 +381,25 @@ export default function SourcesPage() {
                       <tr key={row.property} className="border-b hover:bg-gray-50/60">
                         <td className="px-4 py-2 font-medium">{row.property}</td>
                         <td className="px-4 py-2 text-right">{row.total}</td>
-                        <td className="px-4 py-2 text-right text-emerald-600">{row.converted}</td>
+                        <td className="px-4 py-2 text-right">
+                          {row.converted > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDrillDown({
+                                  property: row.property,
+                                  leads: row.convertedLeads || [],
+                                })
+                              }
+                              className="text-emerald-600 hover:text-emerald-800 hover:underline font-medium"
+                              title="Click to see each conversion"
+                            >
+                              {row.converted}
+                            </button>
+                          ) : (
+                            <span className="text-emerald-600">{row.converted}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-right font-semibold">{pct(row.closeRatio)}</td>
                       </tr>
                     ))}
@@ -443,6 +463,103 @@ export default function SourcesPage() {
           </>
         )}
       </main>
+
+      {drillDown && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 sm:p-8 overflow-y-auto"
+          onClick={() => setDrillDown(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-navy">
+                  Conversions — {drillDown.property}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {drillDown.leads.length} converted lead
+                  {drillDown.leads.length === 1 ? "" : "s"} in window
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrillDown(null)}
+                className="text-gray-400 hover:text-gray-700 text-xl leading-none px-2"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-x-auto max-h-[70vh]">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Source</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Created</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Form / Referrer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drillDown.leads.map((l, i) => (
+                    <tr key={i} className="border-b align-top hover:bg-gray-50/60">
+                      <td className="px-4 py-2 font-medium">
+                        {l.hubspotUrl ? (
+                          <a
+                            href={l.hubspotUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-navy hover:underline"
+                          >
+                            {l.name}
+                          </a>
+                        ) : (
+                          l.name
+                        )}
+                        {l.email && (
+                          <div className="text-xs text-gray-500">{l.email}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-xs font-medium text-gray-700">
+                          {l.source}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-600">
+                        {l.createDate ? new Date(l.createDate).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        {l.formName && (
+                          <div className="text-gray-700">{l.formName}</div>
+                        )}
+                        {l.firstReferrer && (
+                          <div
+                            className="text-gray-500 truncate max-w-md"
+                            title={l.firstReferrer}
+                          >
+                            ↳ {(() => {
+                              try {
+                                return new URL(l.firstReferrer).hostname;
+                              } catch {
+                                return l.firstReferrer;
+                              }
+                            })()}
+                          </div>
+                        )}
+                        {!l.formName && !l.firstReferrer && (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

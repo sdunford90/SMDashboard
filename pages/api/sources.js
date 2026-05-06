@@ -191,6 +191,10 @@ export default async function handler(req, res) {
     const cellMap = new Map();
     const sourceMap = new Map();
     const propertyMap = new Map();
+    // Per-property list of converted-lead detail rows, used by the
+    // /sources page drill-down when the user clicks a property's
+    // Converted count.
+    const convertedByProperty = new Map();
 
     for (const lead of eligible) {
       const property = lead.marina;
@@ -212,6 +216,18 @@ export default async function handler(req, res) {
         cell.converted++;
         src.converted++;
         prop.converted++;
+        if (!convertedByProperty.has(property)) convertedByProperty.set(property, []);
+        convertedByProperty.get(property).push({
+          name: [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || lead.email || "(no name)",
+          email: lead.email || null,
+          source,
+          createDate: lead.createDate || null,
+          convertedAt: lead.convertedAt || null,
+          formName: lead.recentFormName || null,
+          firstReferrer: lead.firstReferrer || null,
+          firstUrl: lead.firstUrl || null,
+          hubspotUrl: lead.hubspotUrl || null,
+        });
       }
     }
 
@@ -233,6 +249,14 @@ export default async function handler(req, res) {
 
     const byProperty = Array.from(propertyMap.values())
       .map(withRatio)
+      .map((r) => ({
+        ...r,
+        convertedLeads: (convertedByProperty.get(r.property) || []).sort(
+          (a, b) =>
+            new Date(b.convertedAt || b.createDate || 0) -
+            new Date(a.convertedAt || a.createDate || 0)
+        ),
+      }))
       .sort((a, b) => b.total - a.total);
 
     const totalLeads = eligible.length;
