@@ -837,7 +837,7 @@ export default function Dashboard() {
                 {activeTab === "never" && (
                   <ActionTable
                     items={filteredNeverResponded}
-                    columns={["Lead", "Marina", "Time Since Created", ""]}
+                    columns={["Lead", "Marina", "Time Since Lead In", ""]}
                     renderRow={(item) => (
                       <tr key={item.contactId} className="border-b hover:bg-yellow-50/30">
                         <td className="px-4 py-3 font-medium text-sm">
@@ -845,7 +845,7 @@ export default function Dashboard() {
                           {item.recentFormDate && (() => { const d = Math.floor((Date.now()-new Date(item.recentFormDate))/86400000); return <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-medium ${d<=7?"bg-emerald-100 text-emerald-700":"bg-blue-50 text-blue-700"}`} title={item.recentFormName||"Form submission"}>📋 {d===0?"Today":`${d}d ago`}</span>; })()}
                         </td>
                         <td className="px-4 py-3 text-sm">{item.marina}</td>
-                        <td className="px-4 py-3 text-sm">{timeAgo(item.createDate)}</td>
+                        <td className="px-4 py-3 text-sm">{timeAgo(getLeadInTs(item))}</td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex items-center gap-3 justify-end">
                             <LeadRecheckButton contactId={item.contactId} onSuccess={fetchAll} />
@@ -884,7 +884,7 @@ export default function Dashboard() {
                           </td>
                           <td className="px-4 py-3 text-sm">{item.marina}</td>
                           <td className={`px-4 py-3 text-sm ${urgencyAgeStyle(item.urgency)}`}>
-                            {timeAgo(item.createDate)}
+                            {timeAgo(getLeadInTs(item))}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500">
                             {item.recentFormDate && (() => {
